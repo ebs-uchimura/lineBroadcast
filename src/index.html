@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>LINE自動配信ツール</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';">
+    <link rel="stylesheet" href="index.css">
+  </head>
+  <body>
+    <h1>LINE自動配信ツール</h1>
+    <label for="task-select">選択して下さい</label><br>
+    <div class="buttonarea">
+      <div class="operation_area">
+        <h3>登録</h3>
+        <button class="button-g" value="immediate" onclick="transfer('immediate_page');">即時配信</button>
+        <button class="button-g" value="reserve" onclick="transfer('reserve_page');">予約配信</button>
+        <button class="button-g" value="registplan" onclick="transfer('regist_plan_page');">プラン作成</button>
+      </div>
+      <div class="check_area">
+        <h3>配信・プラン編集（開発中）</h3>
+        <button class="button-g" value="broadcast" onclick="transfer('view_broadcast_page');" disabled>配信編集</button>
+        <button class="button-g" value="plan" onclick="transfer('view_plan_page');" disabled>プラン編集</button>
+        <button class="button-g" value="image" onclick="transfer('view_image_page');" disabled>画像編集</button>
+      </div>
+      <div class="master_area">
+        <h3>マスタ編集（開発中）</h3>
+        <button class="button-g" value="user" onclick="transfer('view_user_page');" disabled>ユーザ編集</button>
+        <button class="button-g" value="genre" onclick="transfer('view_genre_page');" disabled>ジャンル編集</button>
+        <button class="button-g" value="channel" onclick="transfer('view_channel_page');" disabled>チャンネル編集</button>
+      </div>
+      <div class="exit_area">
+        <h3>終了</h3>
+        <button class="button-g button-8" value="exit" onclick="transfer('exit_page');">終了</button>
+      </div>
+    </div>
+
+    <script>
+      // ページ遷移
+      const transfer = channel => {
+        try {
+          // 配信ページ遷移
+          window.api.send("page", channel);
+
+        } catch(e) {
+          // エラー処理
+          console.log(e);
+        }
+      }
+    </script>
+  </body>
+</html>

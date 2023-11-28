@@ -1,0 +1,179 @@
+/*
+/* form.css
+*/
+
+@charset "utf-8";
+
+h3 {
+	margin-bottom: 5px;
+	font-size: 1rem;
+	color: #ccc;
+}
+
+::placeholder {
+	color: #ccc;
+	font-size: 0.8em;
+}
+
+.dialogs {
+	margin: 30px 0 0 15px;
+}
+.date01 input[type=date] {
+	position: relative;
+}
+
+.date01 input[type=date]::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+}
+
+.date01 input[type=date]::-webkit-clear-button {
+	-webkit-appearance: none;
+}
+
+.date01 input[type=date]::-webkit-calendar-picker-indicator {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	opacity: 0;
+	cursor: pointer;
+}
+
+.time01 input[type=time] {
+	position: relative;
+}
+
+.time01 input[type=time]::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+}
+
+.time01 input[type=time]::-webkit-clear-button {
+	-webkit-appearance: none;
+}
+
+.time01 input[type=time]::-webkit-calendar-picker-indicator {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	opacity: 0;
+	cursor: pointer;
+}
+
+label.modal {
+	position: relative;
+	display: inline-block;
+	width: 200px;
+	height: 36px;
+	border: 2px solid #ccc;
+	border-radius: 15px;
+}
+
+label.modal input[type="date"] {
+	position: relative;
+	padding: 0 10px;
+	width: 200px;
+	height: 36px;
+	border: 0;
+	background: transparent;
+	box-sizing: border-box;
+	font-size: 14px;
+	color: #999;
+}
+
+label.timelabel input[type="time"] {
+	position: relative;
+	padding: 0 10px;
+	width: 200px;
+	height: 36px;
+	border: 0;
+	background: transparent;
+	box-sizing: border-box;
+	font-size: 14px;
+	color: #999;
+}
+
+.cp_ipselect {
+	overflow: hidden;
+	width: 40%;
+	margin: 30px 0 0 15px;
+	text-align: center;
+}
+.cp_ipselect select {
+	width: 100%;
+	padding-right: 1em;
+	cursor: pointer;
+	text-indent: 0.01px;
+	text-overflow: ellipsis;
+	border: none;
+	outline: none;
+	background: transparent;
+	background-image: none;
+	box-shadow: none;
+	-webkit-appearance: none;
+	appearance: none;
+}
+.cp_ipselect select::-ms-expand {
+    display: none;
+}
+.cp_ipselect.cp_sl01 {
+	position: relative;
+	border: 1px solid #bbbbbb;
+	border-radius: 2px;
+	background: #ffffff;
+}
+.cp_ipselect.cp_sl01::before {
+	position: absolute;
+	top: 0.8em;
+	right: 0.9em;
+	width: 0;
+	height: 0;
+	padding: 0;
+	content: '';
+	border-left: 6px solid transparent;
+	border-right: 6px solid transparent;
+	border-top: 6px solid #666666;
+	pointer-events: none;
+}
+.cp_ipselect.cp_sl01 select {
+	padding: 8px 38px 8px 8px;
+	color: #666666;
+}
+.cp_iptxt {
+	position: relative;
+	width: 80%;
+	margin: 20px 3%;
+}
+.cp_iptxt input[type='text'] {
+	font: 15px/24px sans-serif;
+	box-sizing: border-box;
+	width: 100%;
+	padding: 0.3em;
+	transition: 0.3s;
+	letter-spacing: 1px;
+	color: #aaaaaa;
+	border: 1px solid #1b2538;
+	border-radius: 4px;
+}
+.ef input[type='text']:focus {
+	border: 1px solid #da3c41;
+	outline: none;
+	box-shadow: 0 0 5px 1px rgba(218,60,65, .5);
+}
+.cp_iptxt textarea {
+	font: 15px/24px sans-serif;
+	box-sizing: border-box;
+	width: 100%;
+	padding: 0.3em;
+	transition: 0.3s;
+	letter-spacing: 1px;
+	color: #aaaaaa;
+	border: 1px solid #1b2538;
+	border-radius: 4px;
+}
+.ef textarea:focus {
+	border: 1px solid #da3c41;
+	outline: none;
+	box-shadow: 0 0 5px 1px rgba(218,60,65, .5);
+}
+#imagepath {
+	font-size: 0.9em;
+}

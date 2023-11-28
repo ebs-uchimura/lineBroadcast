@@ -1,0 +1,37 @@
+{
+  "name": "broadcast-app",
+  "productName": "broadcast-app",
+  "version": "0.0.1",
+  "description": "Electron application for broadcasting",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && chcp 65001 && electron ."
+  },
+  "keywords": [],
+  "author": {
+    "name": "ebs-uchimura",
+    "email": "uchimura@ebisu-do.jp"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.8.9",
+    "@types/node-cron": "^3.0.11",
+    "@types/ssh2-sftp-client": "^9.0.2",
+    "electron": "^27.1.0",
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "@tpp/pm2": "^2.1.0",
+    "@types/image-size": "^0.8.0",
+    "csv-parse": "^5.5.2",
+    "date-fns-timezone": "^0.1.4",
+    "dotenv": "^16.3.1",
+    "https": "^1.0.0",
+    "image-size": "^1.0.2",
+    "node-cron": "^3.0.3",
+    "path": "^0.12.7",
+    "sqlite3": "^5.1.6",
+    "ssh2-sftp-client": "^9.1.0"
+  }
+}

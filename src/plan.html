@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>LINE自動配信ツール</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';">
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="form.css">
+  </head>
+  <body>
+    <h2>プラン登録</h2>
+    <div class="cp_iptxt">
+      <label class="ef">
+        <input type="text" name="planname" id="planname" placeholder="プラン名">
+      </label>
+    </div>
+    <div class="cp_iptxt">
+      <label class="ef">
+        <input type="text" name="title" id="title" placeholder="タイトル">
+      </label>
+    </div>
+    <div class="form-type">
+      <div class="cp_ipselect cp_sl01">
+        <select id="genre-select">
+          <option value="">--ジャンル選択--</option>
+        </select>
+      </div>
+      <div class="cp_ipselect cp_sl01">
+        <select id="type-select" onchange="typechange(this);">
+          <option value="">--配信タイプ選択--</option>
+          <option value="text">テキスト</option>
+          <option value="image">画像</option>
+          <option value="option">選択肢付き画像</option>
+          <option value="carousel">カルーセル</option>
+        </select>
+      </div>
+    </div>
+    <div id="imagearea">
+      <div id="imgbtn" class="buttonarea">
+        <button class="button-g" value="upload" onclick="upload()">画像選択</button>
+      </div>
+      <div id="imagepath"></div>
+    </div>
+    <div class="cp_iptxt">
+      <label class="ef">
+        <textarea name="plantext" id="plantext" rows="5" placeholder="テキスト"></textarea>
+      </label>
+    </div>
+    <div id="regbtn" class="buttonarea">
+      <button class="button-g" value="register" onclick="register()">プラン登録</button>
+    </div>
+    <div class="buttonarea">
+      <button class="button-g button-4" value="back" onclick="history.back()">戻る</button>
+    </div>
+    <script>
+      // プラン名
+      const plannameDom = document.getElementById('planname');
+      // 配信タイトル
+      const titleDom = document.getElementById('title');
+      // 配信ジャンル
+      const genreDom = document.getElementById('genre-select');
+      // 配信タイプ
+      const typeDom = document.getElementById('type-select');
+      // 配信テキスト
+      const textDom = document.getElementById('plantext');
+      // 配信画像URL
+      const imageurlDom = document.getElementById('imagepath');
+      // 画像ボタンURL
+      const imagebtnDom = document.getElementById('imagearea');
+
+      // ジャンル
+      window.api.on("genre", arg => {
+        // ジャンル自動生成
+        arg.forEach((obj, idx) => {
+          // オプションタグ生成
+          const option = document.createElement('option');
+          // 値代入
+          option.value = String(obj.id);
+          option.textContent  = obj.genrename;
+          // セレクトに追加
+          genreDom.appendChild(option)
+        });
+      });
+
+      // 画像ファイルパス
+      window.api.on("image", arg => {
+        // change dom
+        imageurlDom.innerHTML = arg;
+      });
+
+      // プラン登録完了
+      window.api.on("register_finish", arg => {
+        // メッセージオプション
+        const messageOption = {
+          title: "登録完了",
+          message: "登録が完了しました",
+          type: "info",
+        }
+        window.api.send("showmessage", messageOption);
+        // フォームクリア
+        plannameDom.value = "";
+        titleDom.value = "";
+        textDom.value = "";
+        genreDom.options[0].selected = true;
+        typeDom.options[0].selected = true;
+      });
+
+      // アップロード
+      const upload = () => {
+        try {
+          // 配信モード
+          window.api.send("upload", "");
+
+        } catch(e) {
+          // エラー処理
+          window.api.send("error", e);
+        }
+      }
+
+      // プラン登録
+      const register = () => {
+        try {
+          // エラーフラグ
+          let errorflg;
+          // エラーメッセージ
+          let errorArray = [];
+          // プラン名
+          const planname = plannameDom.value;
+          // 配信タイトル
+          const title = titleDom.value;
+          // ジャンル
+          const genre = genreDom.value;
+          // 選択配信タイプ
+          const type = typeDom.value;
+          // 配信テキスト
+          const text = textDom.value;
+          // 配信画像URL
+          const imageurl = imageurlDom.innerHTML;
+
+          /* バリデーション */
+          // プラン名
+          if (planname == "") {
+            errorArray.push("プラン名が空欄です");
+            errorflg = true;
+          }
+          // タイトル
+          if (title == "") {
+            errorArray.push("タイトルが空欄です");
+            errorflg = true;
+          }
+          // ジャンル
+          if (genreDom.options[0].selected) {
+            errorArray.push("ジャンルを選択してください");
+            errorflg = true;
+          }
+          // 配信タイプ
+          if (typeDom.options[0].selected) {
+            errorArray.push("配信タイプを選択してください");
+            errorflg = true;
+          }
+          // テキスト
+          if (text == "") {
+            errorArray.push("テキストが空欄です");
+            errorflg = true;
+          }
+          
+          // エラーなし
+          if (!errorflg) {
+            // 送付内容
+            const sendObj = {
+              planname: planname,
+              title: title,
+              type: type,
+              text: text,
+              genre: genre,
+              imageurl: imageurl,
+            };
+
+            // 配信モード
+            window.api.send("register", sendObj);
+
+          } else {
+            // メッセージオプション
+            const messageOption = {
+              title: "エラー",
+              message: errorArray.join("|"),
+              type: "error",
+            }
+            window.api.send("showmessage", messageOption);
+          }
+        
+        } catch(e) {
+          // エラー処理
+          window.api.send("error", e);
+        }
+      }
+
+      // セレクトボックス変更
+      const typechange = obj => {
+        // 選択インデックス
+        const idx = obj.selectedIndex;
+        // 値
+        const value = obj.options[idx].value;
+      
+        // 値とテキストをコンソールに出力
+        if (value == "" || value == "text") {
+          imagebtnDom.style.display ="none";
+
+        } else {
+          imagebtnDom.style.display ="block";
+        }
+      }
+    </script>
+  </body>
+</html>

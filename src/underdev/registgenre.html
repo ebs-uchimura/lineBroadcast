@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>LINE自動配信ツール</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';">
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="form.css">
+    <script src="maketable.min.js"></script>
+  </head>
+  <body>
+    <h2>ジャンル登録</h2>
+    <div class="cp_iptxt">
+      <label class="ef">
+        <input type="text" name="genrename" id="genrename" placeholder="ジャンル名">
+      </label>
+    </div>
+    <div id="regbtn" class="buttonarea">
+      <button class="button-g" value="register" onclick="register()">ジャンル登録</button>
+    </div>
+    <div class="buttonarea">
+      <button class="button-g button-4" value="back" onclick="history.back()">戻る</button>
+    </div>
+    <script>
+      // ジャンル名
+      const genrenameDom = document.getElementById('genrename');
+
+      // ジャンル登録完了
+      window.api.on("genre_register_finish", arg => {
+        // メッセージオプション
+        const messageOption = {
+          title: "登録完了",
+          message: "登録が完了しました",
+          type: "info",
+        }
+        window.api.send("showmessage", messageOption);
+        // フォームクリア
+        genrenameDom.value = "";
+      });
+
+      // ページ遷移
+      const transfer = channel => {
+        try {
+          // 配信ページ遷移
+          window.api.send("page", channel);
+
+        } catch(e) {
+          // エラー処理
+          console.log(e);
+        }
+      }
+
+      // ジャンル登録
+      const register = () => {
+        try {
+          // エラーフラグ
+          let errorflg;
+          // エラーメッセージ
+          let errorArray = [];
+          // ジャンル名
+          const genrename = genrenameDom.value;
+
+          /* バリデーション */
+          // ジャンル名
+          if (genrename == "") {
+            errorArray.push("ジャンル名が空欄です");
+            errorflg = true;
+          }
+          
+          // エラーなし
+          if (!errorflg) {
+            // 配信モード
+            window.api.send("genreregister", genrename);
+
+          } else {
+            // メッセージオプション
+            const messageOption = {
+              title: "エラー",
+              message: errorArray.join("|"),
+              type: "error",
+            }
+            window.api.send("showmessage", messageOption);
+          }
+        
+        } catch(e) {
+          // エラー処理
+          window.api.send("error", e);
+        }
+      }
+    </script>
+  </body>
+</html>

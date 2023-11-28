@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>LINE自動配信ツール</title>
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';">
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="table.css">
+    <script src="maketable.min.js"></script>
+  </head>
+  <body>
+    <h2>チャネル一覧</h2>
+    <div id="tablearea"></div>
+    <div class="buttonarea">
+      <button class="button-g" value="reader" onclick="transfer('edit_channel_page');">チャネル編集</button>
+    </div>
+    <div class="buttonarea">
+      <button class="button-g button-4" value="back" onclick="history.back()">戻る</button>
+    </div>
+    <script>
+      // テーブル生成エリア
+      const tblarea = document.getElementById('tablearea');
+      // テーブル自動生成
+      const tbl = document.createElement('div');
+      
+      // テーブル追加
+      tblarea.appendChild(tbl);
+      
+      // 配信一覧
+      window.api.on("channellist", arg => {
+        try {
+          console.log(arg);
+          // テーブル自動生成
+          const tableTagString = maketable([arg.content, arg.key], ["broadcast_table", "broadcast_table"]);
+          // テーブル追加
+          tbl.innerHTML = tableTagString;
+
+        } catch(e) {
+          // エラー処理
+          console.log(e);
+        }
+      });
+
+      // ページ遷移
+      const transfer = channel => {
+        try {
+          // 配信ページ遷移
+          window.api.send("page", channel);
+
+        } catch(e) {
+          // エラー処理
+          console.log(e);
+        }
+      }
+    </script>
+  </body>
+</html>
