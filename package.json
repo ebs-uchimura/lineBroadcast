@@ -6,6 +6,7 @@
   "main": "build/index.js",
   "scripts": {
     "build": "tsc",
+    "build:win": "electron-builder --win --x64 --dir",
     "start": "tsc && chcp 65001 && electron ."
   },
   "keywords": [],
@@ -22,7 +23,6 @@
     "typescript": "^5.2.2"
   },
   "dependencies": {
-    "@tpp/pm2": "^2.1.0",
     "@types/image-size": "^0.8.0",
     "csv-parse": "^5.5.2",
     "date-fns-timezone": "^0.1.4",
@@ -31,7 +31,36 @@
     "image-size": "^1.0.2",
     "node-cron": "^3.0.3",
     "path": "^0.12.7",
+    "save-dev": "^0.0.1-security",
     "sqlite3": "^5.1.6",
     "ssh2-sftp-client": "^9.1.0"
+  },
+  "build": {
+    "appId": "jp.broadcast.app1",
+    "productName": "BroadcastApp",
+    "asar": true,
+    "directories": {
+      "output": "build"
+    },
+    "files": [
+      "**/build/**/*",
+      {
+        "from": "../dist",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": {
+        "target": "dir",
+        "arch": [
+          "x64"
+        ]
+      }
+    },
+    "mac": {
+      "target": "dmg"
+    }
   }
 }

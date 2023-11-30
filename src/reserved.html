@@ -50,14 +50,14 @@
       // 選択チャンネル
       const channelDom = document.getElementById('channel-select');
       // 配信日
-      const datelDom = document.getElementById('date');
+      const dateDom = document.getElementById('date');
       // 配信時刻
-      const timelDom = document.getElementById('time');
+      const timeDom = document.getElementById('time');
       // CSVファイル
       const csvfileDom = document.getElementById('csvfilepath');
 
       // プラン登録完了
-      window.api.on("broadcast_register_finish", _ => {
+      window.api.on("reserve_register_finish", _ => {
         // メッセージオプション
         const messageOption = {
           title: "登録完了",
@@ -67,8 +67,8 @@
         // ポップアップ表示
         window.api.send("showmessage", messageOption);
         // フォームクリア
-        datelDom.value = "";
-        timelDom.value = "00:00";
+        dateDom.value = "";
+        timeDom.value = "00:00";
         csvfileDom.innerHTML = "";
         channelDom.options[0].selected = true;
         plannameDom.options[0].selected = true;
@@ -184,9 +184,9 @@
           // 選択プラン
           const plan = plannameDom.value;
           // 配信日
-          const date = datelDom.value;
+          const date = dateDom.value;
           // 配信時間
-          const time = timelDom.value + ':00';
+          const time = timeDom.value + ':00';
 
           // ユーザなし
           if (!serializedArray) {
@@ -205,7 +205,6 @@
             date: date, // 配信日
             time: time, // 配信時間
             users: userArray, // ユーザ一覧
-            now: false,
           }
           // 予約配信モード
           window.api.send("reserve", reserveOption);

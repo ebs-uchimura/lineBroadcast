@@ -9,25 +9,21 @@ import { BrowserWindow, app, ipcMain, dialog, Tray, Menu, nativeImage } from 'el
 import * as path from 'path'; // path
 import * as https from 'https'; // https
 import * as fs from 'fs'; // fs
-import { parse } from 'csv-parse/sync'; // CSV parser
+import * as dotenv from 'dotenv'; // dotenv
+import * as cron from 'node-cron'; // cron
 import iconv from 'iconv-lite'; // text converter
 import sqlite3 from 'sqlite3'; // sqlite3
-import * as dotenv from 'dotenv'; // dotenv
 import ImageSize from 'image-size'; // image-size
+import { parse } from 'csv-parse/sync'; // CSV parser
 import { formatToTimeZone } from 'date-fns-timezone'; // timezone
-import { exec } from "child_process"; // shell command
-import SSHClient from './class/sshd.js'; // ssh
 import SFTPClient from './class/sftp.js'; // sftp
 
-// モジュール設定
+// dotenv設定
 dotenv.config();
 
 // 定数
 const CSV_ENCODING: string = 'Shift_JIS'; // エンコーディング
 const CHOOSE_FILE: string = '読み込むCSVを選択してください。'; // ファイルダイアログ
-const DUMMYTOKEN: string = process.env.DUMMY_ACCESS_TOKEN!; // LINEアクセストークン
-const EBISUDOTOKEN: string = process.env.EBISUDO_ACCESS_TOKEN!; // LINEアクセストークン
-const SUIJINTOKEN: string = process.env.SUIJIN_ACCESS_TOKEN!; // LINEアクセストークン
 
 // DB設定
 const db: sqlite3.Database = new sqlite3.Database(path.join(__dirname, '../db/broadcast.db'));
@@ -37,11 +33,13 @@ const db: sqlite3.Database = new sqlite3.Database(path.join(__dirname, '../db/br
 */
 // ウィンドウ定義
 let mainWindow: Electron.BrowserWindow;
+// 起動確認フラグ
+let isQuiting: boolean;
 
 // レコード型
 interface recordType {
-  record: string[][];
-  filename: string;
+  record: string[][]; // CSVデータ
+  filename: string; // ファイル名
 }
 
 // ウィンドウ作成
@@ -49,21 +47,46 @@ const createWindow = (): void => {
   try {
     // ウィンドウ
     mainWindow = new BrowserWindow({
-      width: 1200,
-      height: 1000,
+      width: 800, // 幅
+      height: 1000, // 高さ
       webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: true,
+        nodeIntegration: false, // Node.js利用許可
+        contextIsolation: false, // コンテキスト分離
         preload: path.join(__dirname, 'preload.js'),
       },
     });
+
+    // メニューバー非表示
+    mainWindow.setMenuBarVisibility(false);
+
     // index.htmlロード
     mainWindow.loadFile(path.join(__dirname, '../src/index.html'));
 
     // 準備完了
     mainWindow.once('ready-to-show', () => {
       // 開発モード
-      mainWindow?.webContents.openDevTools();
+      // mainWindow?.webContents.openDevTools();
+    });
+
+    // 最小化のときはトレイ常駐
+    mainWindow.on('minimize', (event: any) => {
+      // キャンセル
+      event.preventDefault();
+      // ウィンドウを隠す
+      mainWindow.hide();
+      event.returnValue = false;
+    });
+
+    // 閉じる
+    mainWindow.on('close', (event: any) => {
+      // 起動中
+      if (!isQuiting) {
+        // キャンセル
+        event.preventDefault();
+        // ウィンドウを隠す
+        mainWindow.hide();
+        event.returnValue = false;
+      }
     });
 
     // ウィンドウが閉じたら後片付けする
@@ -79,32 +102,42 @@ const createWindow = (): void => {
 
 // 処理開始
 app.on('ready', () => {
+  // ウィンドウを開く
   createWindow();
-  // タスクアイコン
-  const img = nativeImage.createFromPath(__dirname + "/assets/tray.png");
+  // アイコン
+  const icon = nativeImage.createFromPath(path.join(__dirname, '../assets/tray@2x.png'));
   // トレイ
-  let tray = new Tray(img);
-  // トレイセット
-  tray.setToolTip('Tray app');
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Quit', role: 'quit' },
-  ]));
-});
-
-// ウィンドウクローズ
-app.on('window-all-closed', () => {
-  // apple以外
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  const mainTray = new Tray(icon);
+  // コンテキストメニュー
+  const contextMenu = Menu.buildFromTemplate([
+    // 表示
+    { label: '表示', click: () => {
+        mainWindow.show();
+    }},
+    // 閉じる
+    { label: '閉じる', click: () => {
+        isQuiting = true;
+        app.quit();
+    }}
+  ]);
+  // コンテキストメニューセット
+  mainTray.setContextMenu(contextMenu);
+  // ダブルクリックで再表示
+  mainTray.on("double-click", () => mainWindow.show());
 });
 
 // 起動時
 app.on('activate', () => {
   // 起動ウィンドウなし
   if (BrowserWindow.getAllWindows().length === 0) {
+    // 再起動
     createWindow();
   }
+});
+
+// 閉じるボタン
+app.on('before-quit', _ => {
+  isQuiting = true;
 });
 
 /*
@@ -116,18 +149,6 @@ ipcMain.on('page', async(event, arg) => {
     console.log('showpage mode');
     // 遷移先
     let url: string;
-    /*
-    // 配信フラグ
-    let broadcastFlg: boolean = false;
-    // プランフラグ
-    let planFlg: boolean = false;
-    // チャンネルフラグ
-    let channelFlg: boolean = false;
-    // ジャンルフラグ
-    let genreFlg: boolean = false;
-    // ユーザフラグ
-    let userFlg: boolean = false;
-    */
     // プランマスタフラグ
     let planMasterFlg: boolean = false;
     // チャネルマスタフラグ
@@ -146,6 +167,7 @@ ipcMain.on('page', async(event, arg) => {
         if (process.platform !== 'darwin') {
           app.quit();
         }
+        // 遷移先
         url = '';
         break;
 
@@ -169,80 +191,6 @@ ipcMain.on('page', async(event, arg) => {
         url = '../src/registplan.html';
         console.log('regist_plan_page mode');
         break;
-
-      /*
-      // ◇ 確認
-      // 配信確認モード
-      case 'view_broadcast_page':
-        // 遷移先
-        url = '../src/viewbroadcast.html';
-        console.log('view_broadcast_page mode');
-        break;
-
-      // プラン確認モード
-      case 'view_plan_page':
-        // 遷移先
-        url = '../src/viewplan.html';
-        console.log('view_plan_page mode');
-        break;
-
-      // ユーザ確認モード
-      case 'view_user_page':
-        // 遷移先
-        url = '../src/viewuser.html';
-        console.log('view_user_page mode');
-        break;
-
-      // ジャンル確認モード
-      case 'view_genre_page':
-        // 遷移先
-        url = '../src/viewgenre.html';
-        console.log('view_genre_page mode');
-        break;
-        
-      // チャンネル確認モード
-      case 'view_channel_page':
-        // 遷移先
-        url = '../src/viewchannel.html';
-        console.log('view_channel_page mode');
-        break;
-
-      // ◇ 編集
-      // 配信編集モード
-      case 'edit_broadcast_page':
-        // 遷移先
-        url = '../src/editbroadcast.html';
-        console.log('edit_broadcast_page mode');
-        break;
-
-      // プラン編集モード
-      case 'edit_plan_page':
-        // 遷移先
-        url = '../src/editplan.html';
-        console.log('edit_plan_page mode');
-        break;
-
-      // ユーザ編集モード
-      case 'edit_user_page':
-        // 遷移先
-        url = '../src/edituser.html';
-        console.log('edit_user_page mode');
-        break;
-
-      // ジャンル編集モード
-      case 'edit_genre_page':
-        // 遷移先
-        url = '../src/editgenre.html';
-        console.log('edit_genre_page mode');
-        break;
-
-      // チャネル編集モード
-      case 'edit_channel_page':
-        // 遷移先
-        url = '../src/editchannel.html';
-        console.log('edit_channel_page mode');
-        break;
-      */
 
       default:
         // 遷移先
@@ -274,123 +222,12 @@ ipcMain.on('page', async(event, arg) => {
         typeMethodMasterFlg = true;
         break;
 
-      // ◇ 確認
-      // 配信確認モード
-      /*
-      case 'view_broadcast_page':
-        // 配信対象
-        broadcastFlg = true;
-        break;
-
-      // プラン確認モード
-      case 'view_plan_page':
-        // プラン対象
-        planFlg = true;
-        break;
-
-      // ユーザ確認モード
-      case 'view_user_page':
-        // ユーザ対象
-        userFlg = true;
-        break;
-
-      // ジャンル確認モード
-      case 'view_genre_page':
-        // ジャンル対象
-        genreFlg = true;
-        break;
-        
-      // チャンネル確認モード
-      case 'view_channel_page':
-        // チャンネル対象
-        channelFlg = true;
-        break;
-
-      // ◇ 編集
-      // 配信編集モード
-      case 'edit_broadcast_page':
-        // 配信対象
-        broadcastFlg = true;
-        break;
-
-      // プラン編集モード
-      case 'edit_plan_page':
-        // プラン対象
-        planFlg = true;
-        break;
-
-      // ユーザ編集モード
-      case 'edit_user_page':
-        // ユーザ対象
-        userFlg = true;
-        break;
-
-      // ジャンル編集モード
-      case 'edit_genre_page':
-        // ジャンル対象
-        genreFlg = true;
-        break;
-
-      // チャネル編集モード
-      case 'edit_channel_page':
-        // チャンネル対象
-        channelFlg = true;
-        break;
-      */
-
       default:
         // 遷移先
         url = '';
         console.log('out of scope.');
         break;
     }
-
-    /*
-    // 配信
-    if (broadcastFlg) {
-      console.log('select from broadcast db');
-      // 配信抽出
-      const broadcastObj = await getSelectedArray('broadcast', true);
-      // 配信一覧返し
-      event.sender.send('broadcastlist', broadcastObj);
-    }
-
-    // プラン
-    if (planFlg) {
-      console.log('select from plan db');
-      // 配信抽出
-      const planObj = await getSelectedArray('plan', true);
-      // プラン一覧返し
-      event.sender.send('planlist', planObj);
-    }
-    
-    // チャネル
-    if (channelFlg) {
-      console.log('select from channel db');
-      // チャネル抽出
-      const channelObj = await getSelectedArray('channel', true);
-      // プラン一覧返し
-      event.sender.send('channellist', channelObj);
-    }
-
-    // ジャンル
-    if (genreFlg) {
-      console.log('select from genre db')
-      // ジャンル抽出
-      const genreObj = await getSelectedArray('genre', true);
-      // プラン一覧返し
-      event.sender.send('genrelist', planObj);
-    }
-
-    // ユーザ
-    if (userFlg) {
-      console.log('select from user db');
-      // ユーザ抽出
-      const userObj = await getSelectedArray('user', true);
-      // ユーザ一覧返し
-      event.sender.send('userlist', userObj);
-    }
-    */
 
     // プランマスタ
     if (planMasterFlg) {
@@ -469,9 +306,9 @@ ipcMain.on('planregister', async(event, arg) => {
     // 現在時刻
     const nowFormattedTime: string = getNowTime();
     
-    // DB登録
+    // 抽出
     db.serialize(() => {
-      // 全データ登録
+      // DB登録
       db.run('INSERT INTO plan (planname, genre_id, imageurl, linemethod_id, title, text, imageratio, usable, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [arg.planname, arg.genre, mainFilename, Number(arg.type), arg.title, arg.text, fixedImageRatio, 1, nowFormattedTime, nowFormattedTime]);
     });
 
@@ -484,111 +321,14 @@ ipcMain.on('planregister', async(event, arg) => {
   }
 });
 
-/*
-// ジャンル登録
-ipcMain.on('genreregister', async(event, arg) => {
-  try {
-    // 現在時刻
-    const nowFormattedTime: string = getNowTime();
-    
-    // DB登録
-    db.serialize(() => {
-      // 全データ登録
-      db.run('INSERT INTO genre (genrename, usable, created_at, updated_at) VALUES (?, ?, ?, ?)', [arg, 1, nowFormattedTime, nowFormattedTime]);
-    });
-
-    // ジャンル一覧返し
-    event.sender.send('genre_register_finish', '');
-
-  } catch(e: unknown) {
-    // エラー
-    console.log(e);
-  }
-});
-
-// チャンネル登録
-ipcMain.on('channelregister', async(event, arg) => {
-  try {
-    // 現在時刻
-    const nowFormattedTime: string = getNowTime();
-    
-    // DB登録
-    db.serialize(() => {
-      // 全データ登録
-      db.run('INSERT INTO channel (channelname, development, usable, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [arg, 0, 1, nowFormattedTime, nowFormattedTime]);
-    });
-
-    // ジャンル一覧返し
-    event.sender.send('channel_register_finish', '');
-
-  } catch(e: unknown) {
-    // エラー
-    console.log(e);
-  }
-});
-*/
-
 // 配信
 ipcMain.on('broadcast', async(event, arg) => {
   try {
     console.log('broadcast mode');
-    // 現在時刻
-    const nowFormattedTime: string = getNowTime();
-    // プランID
-    const planId = Number(arg.plan);
-    // 抽出
-    db.all('SELECT * FROM plan WHERE id = ?', [planId], (_, rows: any) => {
-      // トークン
-      let token: string;
-      // タイトル
-      const title: string = rows[0].title;
-      // 本文
-      const content: string = rows[0].text;
-      // 画像URL
-      const imgurl: string = rows[0].imageurl;
-      // LINE登録
-      const lineMethod: string = String(rows[0].linemethod_id);
-      // 画像比率
-      const imageRatio: number = Number(rows[0].imageratio); // 小数点第１位
-
-      // トークン設定
-      switch (arg.channel) {
-        // 恵比寿堂ダミー
-        case '1':
-          token = DUMMYTOKEN;
-          break;
-
-        // 恵比寿堂
-        case '2':
-          token = EBISUDOTOKEN;
-          break;
-        
-        // 酔神くらぶ
-        case '3':
-          // 遷移先
-          token = SUIJINTOKEN;
-          break;
-      }
-
-      // チャネル一覧返し
-      arg.users.forEach(async(usr: any) => {
-        // メッセージ送信
-        await makeMessage(usr, token, title, content, imgurl, lineMethod, imageRatio);
-      });
-    });
-
-    // DB登録
-    db.serialize(() => {
-      // 配信準備
-      const stmt: sqlite3.Statement = db.prepare("INSERT INTO broadcast (plan_id, channel_id, userid, sendtime, usable, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
-      // 一斉登録
-      arg.users.forEach((usr: any) => {
-          stmt.run([arg.plan, arg.channel, usr, nowFormattedTime, 0, nowFormattedTime, nowFormattedTime]);
-      });
-      // 登録完了
-      stmt.finalize();
-    });
-
+    // LINE配信
+    await sendLineMessage(arg);
+    // 全データ登録
+    await dbRegistration(arg, false);
     // ジャンル一覧返し
     event.sender.send('broadcast_register_finish', '');
 
@@ -601,11 +341,32 @@ ipcMain.on('broadcast', async(event, arg) => {
 // 配信
 ipcMain.on('reserve', async(event, arg) => {
   try {
-    console.log('broadcast mode');
-    // シェルコマンド実行
-    await execAsync("node server/timer.js '*/5 * * * *'").catch(() => "");
+    console.log('reserve mode');
+    console.log(arg);
+    // 全データ登録
+    await dbRegistration(arg, true);
+    // 日付用
+    const dateArray: string[] = arg.date.split('-');
+    // 時間用
+    const timeArray: string[] = arg.time.split(':');
+    // 月
+    const month: string = isNaN(Number(dateArray[1])) ? '*' : String(Number(dateArray[1]));
+    // 日
+    const day: string = isNaN(Number(dateArray[2])) ? '*' : String(Number(dateArray[2]));
+    // 時
+    const hour: string = isNaN(Number(timeArray[0])) ? '*' : String(Number(timeArray[0]));
+    // 分
+    const minute: string = isNaN(Number(timeArray[1])) ? '*' : String(Number(timeArray[1]));
+
+    // スケジュール予約
+    cron.schedule(`${minute} ${hour} ${day} ${month} *`, async() => {
+      // LINE配信
+      await sendLineMessage(arg);
+    });
+    console.log(`running on ${month}/${day} ${hour}:${minute}`);
     // ジャンル一覧返し
-    event.sender.send('reserve_register_finish', '');   
+    event.sender.send('reserve_register_finish', '');
+    
 
   } catch(e: unknown) {
     // エラー
@@ -619,7 +380,6 @@ ipcMain.on('upload', async(event, arg) => {
     console.log('upload mode');
     // 画像ファイルパス取得
     const filepath: string = await getImageFile();
-
     // 画像ファイルパス返し
     event.sender.send(arg, filepath);
 
@@ -633,17 +393,25 @@ ipcMain.on('upload', async(event, arg) => {
 ipcMain.on('csv', async(event, _) => {
   try {
     console.log('csv mode');
-    // CSVデータ取得
-    const result: recordType = await getCsvData();
     // エラーフラグ
     let errFlg: boolean;
+    // CSVデータ取得
+    const result: any = await getCsvData();
+
+    // エラー
+    if (result == 'error') {
+      // エラー発生
+      throw new Error('csv読み込みエラー');
+    }
 
     // ユーザID一覧返し
     Promise.all(
-      result.record[0].map(async(rec: any) => {
+      // 結果ループ
+      result.record[0].map(async (rec: any) => {
         return new Promise((resolve, _) => {
           // ユーザIDが33桁でない
           if (rec.length != 33 && rec != "") {
+            // エラー対象
             errFlg = true;
           }
           // フラグオン
@@ -659,7 +427,7 @@ ipcMain.on('csv', async(event, _) => {
 
       } else {
         // エラーメッセージ
-        const errMsg: string = 'CSVデータの形式が不正です（33桁が正常)';
+        const errMsg: string = 'CSVデータの形式が不正です(33桁が正常)';
         // クライアントに送信
         event.sender.send('error', errMsg);
         // エラー発生
@@ -714,7 +482,7 @@ ipcMain.on('showmessage', async(_, arg) => {
       type: tmpType, // タイプ
       title: tmpTitle, // ヘッダ
       message: arg.title.toString(), // メッセージタイトル
-      detail: arg.message  // 説明文
+      detail: arg.message,  // 説明文
     };
     // ダイアログ表示
     dialog.showMessageBox(options);
@@ -728,6 +496,110 @@ ipcMain.on('showmessage', async(_, arg) => {
 /*
  汎用関数
 */
+// DB登録
+const dbRegistration = (arg: any, flg: boolean): Promise<void> => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // 配信時間
+      let broadcastTime: string;
+      // プランID
+      const planId = Number(arg.plan);
+      // チャンネルID
+      const channelId = Number(arg.channel);
+      // 現在時刻
+      const nowFormattedTime: string = getNowTime();
+
+      // 予約時のみ
+      if (flg) {
+        // 配信日時
+        const date: string = arg.date;
+        // 配信時刻
+        const time: string = arg.time;
+        // 配信時間
+        broadcastTime = `${date} ${time}`;
+
+      } else {
+        // 現在時刻
+        broadcastTime = nowFormattedTime;
+      }
+      
+      db.serialize(() => {
+        // 全データ登録
+        db.run('INSERT INTO broadcast (plan_id, channel_id, sendtime, usable, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [planId, channelId, broadcastTime, 0, nowFormattedTime, nowFormattedTime]);
+        // 直近にINSERTしたデータを取得
+        db.get('SELECT * FROM broadcast WHERE rowid = last_insert_rowid()', (_, rows: any)  => {
+          // 配信準備
+          const stmt: sqlite3.Statement = db.prepare("INSERT INTO targetuser (broadcast_id, userid, usable, created_at, updated_at) VALUES (?, ?, ?, ?, ?)");
+          // 一斉登録
+          arg.users.forEach((usr: any) => {
+            stmt.run([rows.id, usr, 0, nowFormattedTime, nowFormattedTime]);
+          });
+          // 登録完了
+          stmt.finalize();
+          console.log('broadcast registration finished');
+        });
+      });
+
+      resolve();
+
+    } catch(e: unknown) {
+      // エラー
+      console.log(e);
+      reject();
+    }
+  });
+}
+
+// LINE配信
+const sendLineMessage = (arg: any): Promise<void> => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // プランID
+      const planId = Number(arg.plan);
+      // チャンネルID
+      const channelId = Number(arg.channel);
+
+      // DB抽出
+      db.serialize(() => {
+        // トークン
+        let token: string;
+        
+        // 抽出
+        db.all('SELECT * FROM channel WHERE id = ?', [channelId], (_, rows: any) => {
+          // トークン
+          token = rows[0].token;
+        });
+
+        // 抽出
+        db.all('SELECT * FROM plan WHERE id = ?', [planId], (_, rows: any) => {
+          // タイトル
+          const title: string = rows[0].title;
+          // 本文
+          const content: string = rows[0].text;
+          // 画像URL
+          const imgurl: string = rows[0].imageurl;
+          // LINE登録
+          const lineMethod: string = String(rows[0].linemethod_id);
+          // 画像比率(小数点第１位)
+          const imageRatio: number = Number(rows[0].imageratio);
+
+          // チャネル一覧返し
+          arg.users.forEach(async(usr: any) => {
+            // メッセージ送信
+            await makeMessage(usr, token, title, content, imgurl, lineMethod, imageRatio);
+          });
+        });
+        resolve();
+      });
+      
+    } catch(e: unknown) {
+      // エラー
+      console.log(e);
+      reject(e);
+    }
+  });
+}
+
 // WEBHOOK
 const makeMessage = (uid: string, token: string, title?: string, contentText?: string, imgurl?: any, planno?: string, ratio?: number): Promise<void> => {
   return new Promise(async (resolve, reject) => {
@@ -750,13 +622,13 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
             to: uid, // 返信トークン
             messages: [
               {
-                "type": "text",
-                "text": "Hello, world"
+                "type": "text", // テキスト
+                "text": contentText, // 本文
             }
             ],
           });
           // 配信
-          await makeBroadcaster(headers, dataString);
+          await makeBroadcast(headers, dataString);
           resolve();
           break;
         
@@ -768,23 +640,23 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
             to: uid, // 返信トークン
             messages: [
               {
-                type: "flex",
-                altText: "テスト",
+                type: "flex", // flex
+                altText: title, // 代替タイトル
                 contents: {
-                  type: "bubble",
-                  size: "giga",
+                  type: "bubble", // 吹き出し
+                  size: "giga", // フルサイズ
                   hero: {
-                    type: "image",
-                    url: imgurl,
-                    size: "full",
-                    aspectRatio: `${ratio}:13`,
+                    type: "image", // 画像
+                    url: imgurl, // 画像url
+                    size: "full", // フル
+                    aspectRatio: `${ratio}:1`, // 画像縦横比
                   }
                 }
               }
             ],
           });
           // 配信
-          await makeBroadcaster(headers, dataString);
+          await makeBroadcast(headers, dataString);
           resolve();
           break;
         
@@ -795,19 +667,19 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
           dataString = JSON.stringify({
             to: uid, // 返信トークン
             messages: [{
-              type: 'template',
-              altText: '前回の注文商品から選択してください。',
+              type: 'template', // テンプレート
+              altText: title, // 代替タイトル
               template: {
-                  type: 'buttons',
-                  thumbnailImageUrl: imgurl,
-                  imageSize: 'cover',
-                  title: title,
-                  text: contentText,
+                  type: 'buttons', // 吹き出し
+                  thumbnailImageUrl: imgurl, // 画像url
+                  imageSize: 'cover', // 切り取り
+                  title: title, // タイトル
+                  text: contentText, // 本文
               },
             }],
           });
           // 配信
-          await makeBroadcaster(headers, dataString);
+          await makeBroadcast(headers, dataString);
           resolve();
           break;
         
@@ -818,33 +690,33 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
           dataString = JSON.stringify({
             to: uid, // 返信トークン
             messages: [{
-              type: "template",
-              altText: title,
+              type: "template", // テンプレート
+              altText: title, // タイトル
               template: {
-                type: "image_carousel",
+                type: "image_carousel", // カルーセル
                 columns: [
                   {
-                    imageUrl: imgurl[0],
+                    imageUrl: imgurl[0], // 画像
                     action: {
-                      type: "postback",
-                      label: "Buy",
-                      data: "action=buy&itemid=111"
+                      type: "message", // メッセージ
+                      label: title, // タイトル
+                      text: contentText, // 本文
                     }
                   },
                   {
                     imageUrl: imgurl[1],
                     action: {
                       type: "message",
-                      label: "Yes",
-                      text: "yes"
+                      label: title,
+                      text: contentText,
                     }
                   },
                   {
                     imageUrl: imgurl[2],
                     action: {
-                      type: "uri",
-                      label: "View detail",
-                      uri: "http://example.com/page/222"
+                      type: "message",
+                      label: title,
+                      text: contentText,
                     }
                   }
                 ]
@@ -852,7 +724,7 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
             }]
           });
           // 配信
-          await makeBroadcaster(headers, dataString);
+          await makeBroadcast(headers, dataString);
           resolve();
           break;
 
@@ -863,7 +735,7 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
     } catch(e: unknown) {
       // エラー
       console.log(e);
-      reject(e);
+      reject();
     }
   });
 }
@@ -909,7 +781,7 @@ const getImageFile = (): Promise<string> => {
 }
 
 // CSV抽出
-const getCsvData = (): Promise<recordType> => {
+const getCsvData = (): Promise<recordType | string> => {
   return new Promise((resolve, reject) => {
     try {
       // ファイル選択ダイアログ
@@ -939,8 +811,8 @@ const getCsvData = (): Promise<recordType> => {
             });
             // 値返し
             resolve({
-              record: tmpRecords,
-              filename: filenames[0],
+              record: tmpRecords, // データ
+              filename: filenames[0], // ファイル名
             });
           });
 
@@ -957,13 +829,13 @@ const getCsvData = (): Promise<recordType> => {
     } catch(e: unknown) {
       // エラー
       console.log(e);
-      reject(String(e));
+      reject('error');
     }
   });
 }
 
 // LINE配信
-const makeBroadcaster = (headers: Headers, dataString?: string): Promise<void> => {
+const makeBroadcast = (headers: Headers, dataString?: string): Promise<void> => {
   return new Promise(async(resolve, reject) => {
     try {
       // WEBHOOKオプション
@@ -989,40 +861,6 @@ const makeBroadcaster = (headers: Headers, dataString?: string): Promise<void> =
 
     } catch(e: unknown) {
       reject(e);
-    }
-  });
-}
-
-// SSH接続
-const sshCommand = async(date: string): Promise<void> => {
-  return new Promise(async(resolve, reject) => {
-    try {
-      // ホスト名
-      const host: string = process.env.SSH_HOST ?? '';
-      // ポート番号
-      const port: number = Number(process.env.SSH_PORT) ?? 22;
-      // ユーザ名
-      const username: string = process.env.SSH_USERNAME ?? 'root';
-      // 鍵パスワード
-      const userpassword: string = process.env.SSH_KEYPASS ?? '';
-      // SSHクライアント
-      const client: any = new SSHClient();
-      // SSH接続
-      const connectResult: string = await client.connect({ host, port, username, userpassword });
-      console.log(connectResult);
-      // コマンド実行
-      const commandResult:string = await client.doCommand('');
-      console.log(commandResult);
-      // 切断
-      await client.disconnect();
-      console.log('ssh closed');
-      // 完了
-      resolve();
-
-    } catch (e: unknown) {
-      // エラー
-      console.error('ssh command failed:', e);
-      reject();
     }
   });
 }
@@ -1074,61 +912,3 @@ const getNowTime = (): string => {
   // フォーマット済み現在時刻
   return formatToTimeZone(now, FORMAT, {timeZone: TIME_ZONE_TOKYO});
 }
-
-// 配信内容抽出
-const getSelectedArray = (type: string, usableFlg: boolean): any => {
-  return new Promise(async(resolve, reject) => {
-    try {
-      console.log(`select from ${type} db`);
-      // クエリ
-      let query: string;
-
-      // 利用可能フラグあり
-      if (usableFlg) {
-        query = `SELECT * FROM ${type} WHERE usable = 1`;
-
-      } else {
-        query = `SELECT * FROM ${type}`;
-      }
-
-      // 配信抽出
-      db.all(query, (_, rows) => {
-        // 格納用配列
-        let headerArray: any = [];
-        let contentsArray: any = [];
-        // 結果ループ
-        rows.forEach((rw: any, index: number) => {
-          // キー抽出
-          if (index == 0) {
-            headerArray = Object.keys(rw);
-          }
-          // 値抽出
-          contentsArray.push(Object.values(rw));
-        });
-        // 受渡し用
-        const targetObj: any = {
-          key: headerArray, // ヘッダ
-          content: contentsArray, // コンテンツ
-        }
-        // オブジェクト返し
-        resolve(targetObj);
-      });
-
-    } catch (e: unknown) {
-      // エラー
-      console.error('Uploading failed:', e);
-      reject(e);
-    }
-  });
-}
-
-// シェルコマンド実行
-const execAsync = (command: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    exec(command, (error, stdout, stderr) => {
-      if (error) reject(error);
-      if (stderr) reject(stderr);
-      resolve(stdout);
-    });
-  });
-};
