@@ -10,8 +10,8 @@ import { contextBridge, ipcRenderer } from 'electron'; // electron
 // contextBridge
 contextBridge.exposeInMainWorld(
     "api", {
-        // send to ipcMain
-        send: (channel: string, data: any) => { // send to ipcMain
+        // ipcMainに送る
+        send: (channel: string, data: any) => {
             try {
                 ipcRenderer.send(channel, data);
 
@@ -19,8 +19,8 @@ contextBridge.exposeInMainWorld(
                 console.log(e);
             }    
         },
-        // recieve from ipcMain
-        on: (channel: string, func: any) => { //from ipcMain
+        // ipcMainから受け取り
+        on: (channel: string, func: any) => {
             try {
                 ipcRenderer.on(channel, (_, ...args) => func(...args));
 

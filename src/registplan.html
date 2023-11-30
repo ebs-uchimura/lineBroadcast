@@ -6,14 +6,13 @@
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';">
     <link rel="stylesheet" href="index.css">
     <link rel="stylesheet" href="form.css">
-    <script src="maketable.min.js"></script>
   </head>
   <body>
     <h2>プラン登録</h2>
     <div class="cp_iptxt">
       <h3>プラン名</h3>
       <label class="ef">
-        <input type="text" name="planname" id="planname" placeholder="プラン名">
+        <input type="text" name="planname" id="planname" pl aceholder="プラン名">
       </label>
     </div>
     <div class="cp_iptxt">
@@ -51,6 +50,7 @@
     <div class="buttonarea">
       <button class="button-g button-4" value="back" onclick="history.back()">戻る</button>
     </div>
+
     <script>
       // プラン名
       const plannameDom = document.getElementById('planname');
@@ -76,6 +76,7 @@
             const option = document.createElement('option');
             // 値代入
             option.value = String(obj.id);
+            // ジャンル代入
             option.textContent  = obj.genrename;
             // セレクトに追加
             genreDom.appendChild(option);
@@ -90,13 +91,13 @@
       // 配信方法
       window.api.on("lineMethodMasterlist", arg => {
         try {
-          console.log(arg);
           // ジャンル自動生成
           arg.forEach((obj, idx) => {
             // オプションタグ生成
             const option = document.createElement('option');
             // 値代入
             option.value = String(obj.id);
+            // ジャンル代入
             option.textContent  = obj.linemethodname;
             // セレクトに追加
             typeDom.appendChild(option);
@@ -115,21 +116,37 @@
       });
 
       // プラン登録完了
-      window.api.on("plan_register_finish", arg => {
+      window.api.on("plan_register_finish", _ => {
+        // 配信
+        showNotification(false);
         // メッセージオプション
         const messageOption = {
           title: "登録完了",
           message: "登録が完了しました",
           type: "info",
         }
+        // メッセージ表示
         window.api.send("showmessage", messageOption);
         // フォームクリア
         plannameDom.value = "";
         titleDom.value = "";
         textDom.value = "";
         imageurlDom.innerHTML = "";
+        // 選択復元
         genreDom.options[0].selected = true;
         typeDom.options[0].selected = true;
+      });
+
+      // エラー表示
+      window.api.on("showerror", arg => {
+        try {
+          // コンソール表示
+          console.log(arg);
+          
+        } catch(e) {
+          // エラー処理
+          console.log(e);
+        }
       });
 
       // ページ遷移
@@ -149,6 +166,8 @@
         try {
           // 配信モード
           window.api.send("upload", str);
+          // 配信
+          showNotification(true);
 
         } catch(e) {
           // エラー処理
@@ -249,6 +268,15 @@
         } else {
           imagebtnDom.style.display ="block";
         }
+      }
+
+      // 通知表示
+      const showNotification = (flg) => {
+        // 通知OK
+        let notifyFlg = false;
+
+        // Notification利用可
+       
       }
     </script>
   </body>

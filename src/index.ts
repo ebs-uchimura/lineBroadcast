@@ -1,7 +1,7 @@
 /**
  * index.ts
  **
- * function：LINE RICHMESSAGE配信用 アプリ
+ * function：LINE配信用 アプリ
 **/
 
 // モジュール
@@ -9,21 +9,21 @@ import { BrowserWindow, app, ipcMain, dialog, Tray, Menu, nativeImage } from 'el
 import * as path from 'path'; // path
 import * as https from 'https'; // https
 import * as fs from 'fs'; // fs
-import * as dotenv from 'dotenv'; // dotenv
 import * as cron from 'node-cron'; // cron
 import iconv from 'iconv-lite'; // text converter
 import sqlite3 from 'sqlite3'; // sqlite3
+import * as dotenv from 'dotenv'; // dotenv
 import ImageSize from 'image-size'; // image-size
+import Client from 'ssh2-sftp-client'; // sfpt client
 import { parse } from 'csv-parse/sync'; // CSV parser
 import { formatToTimeZone } from 'date-fns-timezone'; // timezone
-import SFTPClient from './class/sftp.js'; // sftp
-
-// dotenv設定
-dotenv.config();
 
 // 定数
 const CSV_ENCODING: string = 'Shift_JIS'; // エンコーディング
 const CHOOSE_FILE: string = '読み込むCSVを選択してください。'; // ファイルダイアログ
+
+// モジュール設定
+dotenv.config();
 
 // DB設定
 const db: sqlite3.Database = new sqlite3.Database(path.join(__dirname, '../db/broadcast.db'));
@@ -37,21 +37,27 @@ let mainWindow: Electron.BrowserWindow;
 let isQuiting: boolean;
 
 // レコード型
-interface recordType {
+type recordType = {
   record: string[][]; // CSVデータ
   filename: string; // ファイル名
-}
+};
+
+// 結果型
+type resultType = {
+  result: string; // CSVデータ
+  userid: string; // ファイル名
+};
 
 // ウィンドウ作成
 const createWindow = (): void => {
   try {
     // ウィンドウ
     mainWindow = new BrowserWindow({
-      width: 800, // 幅
+      width: 1200, // 幅
       height: 1000, // 高さ
       webPreferences: {
-        nodeIntegration: false, // Node.js利用許可
-        contextIsolation: false, // コンテキスト分離
+        nodeIntegration: true, // Node.js利用不可
+        contextIsolation: true, // コンテキスト分離
         preload: path.join(__dirname, 'preload.js'),
       },
     });
@@ -65,7 +71,7 @@ const createWindow = (): void => {
     // 準備完了
     mainWindow.once('ready-to-show', () => {
       // 開発モード
-      // mainWindow?.webContents.openDevTools();
+      // mainWindow.webContents.openDevTools();
     });
 
     // 最小化のときはトレイ常駐
@@ -270,8 +276,8 @@ ipcMain.on('page', async(event, arg) => {
     }
 
   } catch(e: unknown) {
-    // エラー
-    console.log(e);
+    // エラー処理
+    errOperate(e, event);
   }
 });
 
@@ -290,7 +296,7 @@ ipcMain.on('planregister', async(event, arg) => {
     // 画像あり
     if (arg.imageurl != '') {
       // 画像アップロード
-      await uploadFile(arg.imageurl);
+      console.log(await uploadFile(arg.imageurl));
       // サイズ計測
       const dimensions: any = ImageSize(arg.imageurl);
       // 画像比率
@@ -316,8 +322,8 @@ ipcMain.on('planregister', async(event, arg) => {
     event.sender.send('plan_register_finish', '');
 
   } catch(e: unknown) {
-    // エラー
-    console.log(e);
+    // エラー処理
+    errOperate(e, event);
   }
 });
 
@@ -326,15 +332,15 @@ ipcMain.on('broadcast', async(event, arg) => {
   try {
     console.log('broadcast mode');
     // LINE配信
-    await sendLineMessage(arg);
+    console.log(await sendLineMessage(arg));
     // 全データ登録
-    await dbRegistration(arg, false);
+    console.log(await dbRegistration(arg, false));
     // ジャンル一覧返し
     event.sender.send('broadcast_register_finish', '');
 
   } catch(e: unknown) {
-    // エラー
-    console.log(e);
+    // エラー処理
+    errOperate(e, event);
   }
 });
 
@@ -342,9 +348,8 @@ ipcMain.on('broadcast', async(event, arg) => {
 ipcMain.on('reserve', async(event, arg) => {
   try {
     console.log('reserve mode');
-    console.log(arg);
     // 全データ登録
-    await dbRegistration(arg, true);
+    console.log(await dbRegistration(arg, true));
     // 日付用
     const dateArray: string[] = arg.date.split('-');
     // 時間用
@@ -361,7 +366,7 @@ ipcMain.on('reserve', async(event, arg) => {
     // スケジュール予約
     cron.schedule(`${minute} ${hour} ${day} ${month} *`, async() => {
       // LINE配信
-      await sendLineMessage(arg);
+      console.log(await sendLineMessage(arg));
     });
     console.log(`running on ${month}/${day} ${hour}:${minute}`);
     // ジャンル一覧返し
@@ -369,8 +374,8 @@ ipcMain.on('reserve', async(event, arg) => {
     
 
   } catch(e: unknown) {
-    // エラー
-    console.log(e);
+    // エラー処理
+    errOperate(e, event);
   }
 });
 
@@ -380,12 +385,13 @@ ipcMain.on('upload', async(event, arg) => {
     console.log('upload mode');
     // 画像ファイルパス取得
     const filepath: string = await getImageFile();
+    console.log(filepath);
     // 画像ファイルパス返し
     event.sender.send(arg, filepath);
 
   } catch(e: unknown) {
-    // エラー
-    console.log(e);
+    // エラー処理
+    errOperate(e, event);
   }
 });
 
@@ -397,12 +403,7 @@ ipcMain.on('csv', async(event, _) => {
     let errFlg: boolean;
     // CSVデータ取得
     const result: any = await getCsvData();
-
-    // エラー
-    if (result == 'error') {
-      // エラー発生
-      throw new Error('csv読み込みエラー');
-    }
+    console.log(result);
 
     // ユーザID一覧返し
     Promise.all(
@@ -436,13 +437,13 @@ ipcMain.on('csv', async(event, _) => {
     });
         
   } catch(e: unknown) {
-    // エラー
-    console.log(e);
+    // エラー処理
+    errOperate(e, event);
   }
 });
 
 // エラー表示
-ipcMain.on('showmessage', async(_, arg) => {
+ipcMain.on('showmessage', async(event, arg) => {
   try {
     console.log('showmessage mode');
     // モード
@@ -488,8 +489,8 @@ ipcMain.on('showmessage', async(_, arg) => {
     dialog.showMessageBox(options);
 
   } catch(e: unknown) {
-    // エラー
-    console.log(e);
+    // エラー処理
+    errOperate(e, event);
   }
 });
 
@@ -497,7 +498,7 @@ ipcMain.on('showmessage', async(_, arg) => {
  汎用関数
 */
 // DB登録
-const dbRegistration = (arg: any, flg: boolean): Promise<void> => {
+const dbRegistration = (arg: any, flg: boolean): Promise<string> => {
   return new Promise(async (resolve, reject) => {
     try {
       // 配信時間
@@ -540,18 +541,21 @@ const dbRegistration = (arg: any, flg: boolean): Promise<void> => {
         });
       });
 
-      resolve();
+      resolve('success');
 
     } catch(e: unknown) {
-      // エラー
-      console.log(e);
-      reject();
+      // エラー型
+      if (e instanceof Error) {
+        // エラー
+        console.log(e);
+        reject(`${e.message}`);
+      }
     }
   });
 }
 
 // LINE配信
-const sendLineMessage = (arg: any): Promise<void> => {
+const sendLineMessage = (arg: any): Promise<string> => {
   return new Promise(async (resolve, reject) => {
     try {
       // プランID
@@ -572,6 +576,8 @@ const sendLineMessage = (arg: any): Promise<void> => {
 
         // 抽出
         db.all('SELECT * FROM plan WHERE id = ?', [planId], (_, rows: any) => {
+          // 結果表示用配列
+          let resultArray: resultType[];
           // タイトル
           const title: string = rows[0].title;
           // 本文
@@ -586,22 +592,30 @@ const sendLineMessage = (arg: any): Promise<void> => {
           // チャネル一覧返し
           arg.users.forEach(async(usr: any) => {
             // メッセージ送信
-            await makeMessage(usr, token, title, content, imgurl, lineMethod, imageRatio);
+            resultArray.push({
+              result: await makeMessage(usr, token, title, content, imgurl, lineMethod, imageRatio),
+              userid: usr,
+            });
           });
         });
-        resolve();
+        // return result
+        resolve('success');
+
       });
       
     } catch(e: unknown) {
-      // エラー
-      console.log(e);
-      reject(e);
+      // エラー型
+      if (e instanceof Error) {
+        // エラー
+        console.log(e);
+        reject(`${e.message}`);
+      }
     }
   });
 }
 
 // WEBHOOK
-const makeMessage = (uid: string, token: string, title?: string, contentText?: string, imgurl?: any, planno?: string, ratio?: number): Promise<void> => {
+const makeMessage = (uid: string, token: string, title?: string, contentText?: string, imgurl?: any, planno?: string, ratio?: number): Promise<string> => {
   return new Promise(async (resolve, reject) => {
     try {
       // ヘッダ
@@ -628,8 +642,8 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
             ],
           });
           // 配信
-          await makeBroadcast(headers, dataString);
-          resolve();
+          console.log(await makeBroadcast(headers, dataString));
+          resolve('success');
           break;
         
         // 画像
@@ -656,8 +670,8 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
             ],
           });
           // 配信
-          await makeBroadcast(headers, dataString);
-          resolve();
+          console.log(await makeBroadcast(headers, dataString));
+          resolve('success');
           break;
         
         // 選択肢
@@ -679,8 +693,8 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
             }],
           });
           // 配信
-          await makeBroadcast(headers, dataString);
-          resolve();
+          console.log(await makeBroadcast(headers, dataString));
+          resolve('success');
           break;
         
         // カルーセル
@@ -724,18 +738,22 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
             }]
           });
           // 配信
-          await makeBroadcast(headers, dataString);
-          resolve();
+          console.log(await makeBroadcast(headers, dataString));
+          resolve('success');
           break;
 
         default:
           console.log(`Sorry, we are out of ${planno}.`);
+          resolve('error');
       }
 
     } catch(e: unknown) {
-      // エラー
-      console.log(e);
-      reject();
+      // エラー型
+      if (e instanceof Error) {
+        // エラー
+        console.log(e);
+        reject('error');
+      }
     }
   });
 }
@@ -767,15 +785,21 @@ const getImageFile = (): Promise<string> => {
           reject('no file');
         }
 
-      }).catch((e: unknown) => {
-        // エラー
-        console.log(e);
+      }).catch((err: unknown) => {
+        // エラー型
+        if (err instanceof Error) {
+          // エラー発生
+          throw new Error(`${err.message}`);
+        }
       });
 
     } catch(e: unknown) {
-      // エラー
-      console.log(e);
-      reject(e);
+      // エラー型
+      if (e instanceof Error) {
+        // エラー
+        console.log(e);
+        reject(`${e.message}`);
+      }
     }
   });
 }
@@ -821,21 +845,27 @@ const getCsvData = (): Promise<recordType | string> => {
           reject(result.canceled);
         }
 
-      }).catch((e: unknown) => {
-        // エラー
-        console.log(e);
+      }).catch((err: unknown) => {
+        // エラー型
+        if (err instanceof Error) {
+          // エラー発生
+          throw new Error(`${err.message}`);
+        }
       });
 
     } catch(e: unknown) {
-      // エラー
-      console.log(e);
-      reject('error');
+      // エラー型
+      if (e instanceof Error) {
+        // エラー
+        console.log(e);
+        reject(`${e.message}`);
+      }
     }
   });
 }
 
 // LINE配信
-const makeBroadcast = (headers: Headers, dataString?: string): Promise<void> => {
+const makeBroadcast = (headers: Headers, dataString?: string): Promise<string> => {
   return new Promise(async(resolve, reject) => {
     try {
       // WEBHOOKオプション
@@ -850,7 +880,7 @@ const makeBroadcast = (headers: Headers, dataString?: string): Promise<void> => 
       // リクエスト
       const request = https.request(webhookOptions, res => {
         res.on('data', _ => {
-          resolve();
+          resolve('success');
         });
       });
 
@@ -860,13 +890,18 @@ const makeBroadcast = (headers: Headers, dataString?: string): Promise<void> => 
       request.end();
 
     } catch(e: unknown) {
-      reject(e);
+      // エラー型
+      if (e instanceof Error) {
+        // エラー
+        console.log(e);
+        reject(`${e.message}`);
+      }
     }
   });
 }
 
 // ファイルアップロード
-const uploadFile = async(localpath: string): Promise<void> => {
+const uploadFile = async(localpath: string): Promise<string> => {
   return new Promise(async(resolve, reject) => {
     try {
       // アップロード先ファイルパス
@@ -880,23 +915,24 @@ const uploadFile = async(localpath: string): Promise<void> => {
       // SFTP情報取得
       const { host, username, password } = parsedURL;
       // SFTPクライアント
-      const client: any = new SFTPClient();
+      const sftpClient = new Client();
       // SFTP接続
-      const connectResult: string = await client.connect({ host, port, username, password });
-      console.log(connectResult);
+      await sftpClient.connect({ host, port, username, password });
       // 画像ファイルをアップロード
-      const cuploadResult: string = await client.uploadFile(localpath, uploadPath);
-      console.log(cuploadResult);
+      await sftpClient.put(localpath, uploadPath);
       // 切断
-      await client.disconnect();
+      await sftpClient.end();
       console.log('sftp closed');
       // 完了
-      resolve();
+      resolve('upload success');
 
     } catch (e: unknown) {
-      // エラー
-      console.error('Uploading failed:', e);
-      reject();
+      // エラー型
+      if (e instanceof Error) {
+        // エラー
+        console.log(e);
+        reject(`${e.message}`);
+      }
     }
   });
 }
@@ -911,4 +947,33 @@ const getNowTime = (): string => {
   const now: Date = new Date();
   // フォーマット済み現在時刻
   return formatToTimeZone(now, FORMAT, {timeZone: TIME_ZONE_TOKYO});
+}
+
+// Make a new message box and close after n milliseconds
+const tempBox = (options: Electron.MessageBoxOptions, n: number): Promise<void> => {
+  return new Promise(async (resolve, reject) => {
+    // 処理フラグ
+    let resolved: boolean = false;
+    // スレーブ
+    const slave: Electron.BrowserWindow = new BrowserWindow({width: 1, height: 1, show: false});
+    // ダイアログ
+    dialog.showMessageBox(slave, options).then(() => {
+        resolved = true;
+        resolve();
+    }).catch(() => {});
+    await new Promise((res) => setTimeout(res, n));
+    slave.close();
+    if (!resolved) reject();
+  });
+}
+
+// エラー処理
+const errOperate = (e: unknown, event: any) => {
+  // エラー型
+  if (e instanceof Error) {
+    // エラー
+    console.log(e);
+    // 配信方法一覧返し
+    event.sender.send('showerror', `${e.message})`);
+  }
 }

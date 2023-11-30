@@ -6,7 +6,6 @@
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';">
     <link rel="stylesheet" href="index.css">
     <link rel="stylesheet" href="form.css">
-    <script src="maketable.min.js"></script>
   </head>
   <body>
     <h2>予約LINE配信</h2>
@@ -70,6 +69,7 @@
         dateDom.value = "";
         timeDom.value = "00:00";
         csvfileDom.innerHTML = "";
+        // 選択復元
         channelDom.options[0].selected = true;
         plannameDom.options[0].selected = true;
       });
@@ -95,6 +95,7 @@
             const option = document.createElement('option');
             // 値代入
             option.value = String(obj.id);
+            // プラン代入
             option.textContent  = `${obj.id}: ${obj.channelname}`;
             // セレクトに追加
             channelDom.appendChild(option);
@@ -115,6 +116,7 @@
             const option = document.createElement('option');
             // 値代入
             option.value = String(obj.id);
+            // プラン代入
             option.textContent  = `${obj.id}: ${obj.planname}`;
             // セレクトに追加
             plannameDom.appendChild(option)
@@ -190,6 +192,7 @@
 
           // ユーザなし
           if (!serializedArray) {
+            // エラーリスト追加
             errorArray.push("顧客CSVを選択してください");
             errorflg = true;
 

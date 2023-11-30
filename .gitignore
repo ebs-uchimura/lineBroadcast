@@ -36,6 +36,8 @@ build/
 node_modules/
 jspm_packages/
 
+db/
+
 # TypeScript v1 declaration files
 typings/
 
