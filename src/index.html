@@ -14,19 +14,16 @@
         <h3>登録</h3>
         <button class="button-g" value="immediate" onclick="transfer('immediate_page');">即時配信</button>
         <button class="button-g" value="reserve" onclick="transfer('reserve_page');">予約配信</button>
-        <button class="button-g" value="registplan" onclick="transfer('regist_plan_page');">プラン作成</button>
-      </div>
-      <div class="check_area">
-        <h3>配信・プラン編集（開発中）</h3>
-        <button class="button-g" value="broadcast" onclick="transfer('view_broadcast_page');" disabled>配信編集</button>
-        <button class="button-g" value="plan" onclick="transfer('view_plan_page');" disabled>プラン編集</button>
-        <button class="button-g" value="image" onclick="transfer('view_image_page');" disabled>画像編集</button>
       </div>
       <div class="master_area">
-        <h3>マスタ編集（開発中）</h3>
-        <button class="button-g" value="user" onclick="transfer('view_user_page');" disabled>ユーザ編集</button>
-        <button class="button-g" value="genre" onclick="transfer('view_genre_page');" disabled>ジャンル編集</button>
-        <button class="button-g" value="channel" onclick="transfer('view_channel_page');" disabled>チャンネル編集</button>
+        <h3>マスタ編集</h3>
+        <button class="button-g button-6" value="plan" onclick="transfer('regist_plan_page');">プラン編集</button>
+        <button class="button-g button-6" value="genre" onclick="transfer('regist_genre_page');">ジャンル編集</button>
+        <button class="button-g button-6" value="channel" onclick="transfer('regist_channel_page');">チャンネル編集</button>
+      </div>
+      <div class="check_area">
+        <h3>配信確認</h3>
+        <button class="button-g button-4" value="broadcast" onclick="transfer('edit_broadcast_page');">配信編集</button>
       </div>
       <div class="exit_area">
         <h3>終了</h3>

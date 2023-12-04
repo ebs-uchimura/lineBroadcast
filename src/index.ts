@@ -26,8 +26,8 @@ const CHOOSE_FILE: string = '読み込むCSVを選択してください。'; // 
 dotenv.config();
 
 // DB設定
-const db: sqlite3.Database = new sqlite3.Database(path.join(__dirname, '../db/broadcast.db'));
-
+sqlite3.verbose();
+const db: sqlite3.Database = new sqlite3.Database(':memory:');
 /*
  メイン
 */
@@ -56,7 +56,7 @@ const createWindow = (): void => {
       width: 1200, // 幅
       height: 1000, // 高さ
       webPreferences: {
-        nodeIntegration: true, // Node.js利用不可
+        nodeIntegration: false, // Node.js利用不可
         contextIsolation: true, // コンテキスト分離
         preload: path.join(__dirname, 'preload.js'),
       },
@@ -64,14 +64,12 @@ const createWindow = (): void => {
 
     // メニューバー非表示
     mainWindow.setMenuBarVisibility(false);
-
     // index.htmlロード
     mainWindow.loadFile(path.join(__dirname, '../src/index.html'));
-
     // 準備完了
     mainWindow.once('ready-to-show', () => {
       // 開発モード
-      // mainWindow.webContents.openDevTools();
+      mainWindow.webContents.openDevTools();
     });
 
     // 最小化のときはトレイ常駐
@@ -97,7 +95,7 @@ const createWindow = (): void => {
 
     // ウィンドウが閉じたら後片付けする
     mainWindow.on('closed', () => {
-      mainWindow.destroy();
+      // mainWindow.destroy();
     });
 
   } catch(e: unknown) {
@@ -110,6 +108,69 @@ const createWindow = (): void => {
 app.on('ready', () => {
   // ウィンドウを開く
   createWindow();
+  // DBがなければ作成
+  db.serialize(function () {
+    // broadcast
+    db.run(`create table if not exists broadcast (
+      id int primary key,
+      broadcastname text, 
+      plan_id int, 
+      channel_id int,
+      sendtime text not null default CURRENT_TIMESTAMP,
+      usable int default 0,
+      created_at not null default CURRENT_TIMESTAMP,
+      updated_at not null default CURRENT_TIMESTAMP);`
+    );
+    // targetuser
+    db.run(`create table if not exists targetuser (
+      id int primary key,
+      broadcast_id int, 
+      userid text,
+      success int default 0,
+      usable int default 0,
+      created_at not null default CURRENT_TIMESTAMP,
+      updated_at not null default CURRENT_TIMESTAMP);`
+    );
+    // plan
+    db.run(`create table if not exists plan (
+      id int primary key,
+      planname text, 
+      genre_id int,
+      linemethod_id int,
+      imageurl text,
+      title text,
+      text text,
+      imageratio int default 1,
+      usable int default 0,
+      created_at not null default CURRENT_TIMESTAMP,
+      updated_at not null default CURRENT_TIMESTAMP);`
+    );
+    // channel
+    db.run(`create table if not exists channel (
+      id int primary key,
+      channelname text,
+      token text,
+      usable int default 0,
+      created_at not null default CURRENT_TIMESTAMP,
+      updated_at not null default CURRENT_TIMESTAMP);`
+    );
+    // genre
+    db.run(`create table if not exists genre (
+      id int primary key,
+      genrename text,
+      usable int default 0,
+      created_at not null default CURRENT_TIMESTAMP,
+      updated_at not null default CURRENT_TIMESTAMP);`
+    );
+    // linemethod
+    db.run(`create table if not exists linemethod (
+      id int primary key,
+      linemethodname text,
+      usable int default 0,
+      created_at not null default CURRENT_TIMESTAMP,
+      updated_at not null default CURRENT_TIMESTAMP);`
+    );
+  });
   // アイコン
   const icon = nativeImage.createFromPath(path.join(__dirname, '../assets/tray@2x.png'));
   // トレイ
@@ -155,12 +216,14 @@ ipcMain.on('page', async(event, arg) => {
     console.log('showpage mode');
     // 遷移先
     let url: string;
+    // 配信編集フラグ
+    let broadcastEditFlg: boolean = false;
     // プランマスタフラグ
     let planMasterFlg: boolean = false;
-    // チャネルマスタフラグ
-    let channelMasterFlg: boolean = false;
     // ジャンルマスタフラグ
     let genreMasterFlg: boolean = false;
+    // チャネルマスタフラグ
+    let channelMasterFlg: boolean = false;
     // 配信タイプフラグ
     let typeMethodMasterFlg: boolean = false;
     
@@ -172,6 +235,7 @@ ipcMain.on('page', async(event, arg) => {
         // apple以外
         if (process.platform !== 'darwin') {
           app.quit();
+          return false;
         }
         // 遷移先
         url = '';
@@ -190,7 +254,8 @@ ipcMain.on('page', async(event, arg) => {
         url = '../src/reserved.html';
         console.log('reserve_page mode');
         break;
-
+      
+      // ◇ 登録
       // プランモード
       case 'regist_plan_page':
         // 遷移先
@@ -198,11 +263,32 @@ ipcMain.on('page', async(event, arg) => {
         console.log('regist_plan_page mode');
         break;
 
+        // ジャンルモード
+      case 'regist_genre_page':
+        // 遷移先
+        url = '../src/registgenre.html';
+        console.log('regist_genre_page mode');
+        break;
+
+      // チャネルモード
+      case 'regist_channel_page':
+        // 遷移先
+        url = '../src/registchannel.html';
+        console.log('regist_channel_page mode');
+        break;
+
+      // ◇ 編集
+      // 配信編集モード
+      case 'edit_broadcast_page':
+        // 遷移先
+        url = '../src/editbroadcast.html';
+        console.log('edit_broadcast_page mode');
+        break;
+
       default:
         // 遷移先
         url = '';
         console.log('out of scope.');
-        break;
     }
 
     // ページ遷移
@@ -222,26 +308,49 @@ ipcMain.on('page', async(event, arg) => {
 
       // プラン登録モード
       case 'regist_plan_page':
+        // プラン対象
+        planMasterFlg = true;
         // ジャンル対象
         genreMasterFlg = true;
         // 配信方法対象
         typeMethodMasterFlg = true;
         break;
 
+      // ジャンル登録モード
+      case 'genre_plan_page':
+        // ジャンル対象
+        genreMasterFlg = true;
+        break;
+
+      // チャンネル登録モード
+      case 'channel_plan_page':
+        // チャンネル対象
+        channelMasterFlg = true;
+        break;
+
+      // 配信編集モード
+      case 'edit_broadcast_page':
+        // 配信方法対象
+        broadcastEditFlg = true;
+        // プラン対象
+        planMasterFlg = true;
+        // チャンネル対象
+        channelMasterFlg = true;
+        break;
+
       default:
         // 遷移先
         url = '';
         console.log('out of scope.');
-        break;
     }
 
     // プランマスタ
     if (planMasterFlg) {
       console.log('select from plan db');
       // マスタ抽出
-      db.all('SELECT * FROM plan WHERE usable = ?', [1], (_, rows) => {
+      db.all('SELECT * FROM plan WHERE usable = ?', [1], (_, rows1) => {
         // マスタ一覧返し
-        event.sender.send('planMasterllist', rows);
+        event.sender.send('planMasterllist', rows1);
       });
     }
 
@@ -249,9 +358,9 @@ ipcMain.on('page', async(event, arg) => {
     if (channelMasterFlg) {
       console.log('select from channel db');
       // チャネル抽出
-      db.all('SELECT * FROM channel WHERE usable = ?', [1], (_, rows) => {
+      db.all('SELECT * FROM channel WHERE usable = ?', [1], (_, rows2) => {
         // チャネル一覧返し
-        event.sender.send('channelMasterllist', rows);
+        event.sender.send('channelMasterllist', rows2);
       });
     }
 
@@ -259,9 +368,9 @@ ipcMain.on('page', async(event, arg) => {
     if (genreMasterFlg) {
       console.log('select from genre db');
       // ジャンル抽出
-      db.all('SELECT * FROM genre WHERE usable = ?', [1], (_, rows) => {
+      db.all('SELECT * FROM genre WHERE usable = ?', [1], (_, rows3) => {
         // ジャンル一覧返し
-        event.sender.send('genreMasterlist', rows);
+        event.sender.send('genreMasterlist', rows3);
       });
     }
 
@@ -269,9 +378,19 @@ ipcMain.on('page', async(event, arg) => {
     if (typeMethodMasterFlg) {
       console.log('select from linemethod db');
       // 配信方法抽出
-      db.all('SELECT * FROM linemethod WHERE usable = ?', [1], (_, rows) => {
+      db.all('SELECT * FROM linemethod WHERE usable = ?', [1], (_, rows4) => {
         // 配信方法一覧返し
-        event.sender.send('lineMethodMasterlist', rows);
+        event.sender.send('lineMethodMasterlist', rows4);
+      });
+    }
+
+    // 配信編集
+    if (broadcastEditFlg) {
+      console.log('select from broadcast db');
+      // 配信方法抽出
+      db.all('SELECT * FROM broadcast WHERE usable = ?', [1], (_, rows5) => {
+        // 配信方法一覧返し
+        event.sender.send('broadcastMasterlist', rows5);
       });
     }
 
@@ -281,7 +400,7 @@ ipcMain.on('page', async(event, arg) => {
   }
 });
 
-/* 処理 */
+/* 登録処理 */
 // プラン登録
 ipcMain.on('planregister', async(event, arg) => {
   try {
@@ -319,7 +438,7 @@ ipcMain.on('planregister', async(event, arg) => {
     });
 
     // ジャンル一覧返し
-    event.sender.send('plan_register_finish', '');
+    event.sender.send('register_finish', '');
 
   } catch(e: unknown) {
     // エラー処理
@@ -327,50 +446,161 @@ ipcMain.on('planregister', async(event, arg) => {
   }
 });
 
-// 配信
+// ジャンル登録
+ipcMain.on('genreregister', async(event, arg) => {
+  try {
+    // 現在時刻
+    const nowFormattedTime: string = getNowTime();
+    
+    // DB登録
+    db.serialize(() => {
+      // 全データ登録
+      db.run('INSERT INTO genre (genrename, usable, created_at, updated_at) VALUES (?, ?, ?, ?)', [arg, 1, nowFormattedTime, nowFormattedTime]);
+    });
+    // ジャンル一覧返し
+    event.sender.send('register_finish', '');
+
+  } catch(e: unknown) {
+    // エラー
+    console.log(e);
+  }
+});
+
+// チャンネル登録
+ipcMain.on('channelregist', async(event, arg) => {
+  try {
+    // 現在時刻
+    const nowFormattedTime: string = getNowTime();
+    
+    // DB登録
+    db.serialize(() => {
+      // 全データ登録
+      db.run('INSERT INTO channel (channelname, token, usable, created_at, updated_at) VALUES (?, ?, ?, ?)', [arg, 1, nowFormattedTime, nowFormattedTime]);
+    });
+    // ジャンル一覧返し
+    event.sender.send('register_finish', '');
+
+  } catch(e: unknown) {
+    // エラー
+    console.log(e);
+  }
+});
+
+/* 配信処理 */
+// 即時配信
 ipcMain.on('broadcast', async(event, arg) => {
   try {
     console.log('broadcast mode');
-    // LINE配信
-    console.log(await sendLineMessage(arg));
     // 全データ登録
-    console.log(await dbRegistration(arg, false));
-    // ジャンル一覧返し
-    event.sender.send('broadcast_register_finish', '');
+    const dbBdResult: string = await dbBroadcastReg(arg, false);
 
+    // 成功
+    if (dbBdResult == 'success') {
+      // LINE配信
+      const lineResult: resultType[] = await sendLineMessage(arg);
+      // DB登録
+      const dbUserResult: string = await dbTargetuserReg(lineResult);
+
+      // 結果
+      if (dbUserResult == 'success') {
+        // 通知送付
+        event.sender.send('register_finish', '');
+
+      } else {
+        // 通知送付
+        event.sender.send('error', dbUserResult);
+      }
+      
+    } else {
+      // エラー返し
+      event.sender.send('error', dbBdResult);
+    }
+    
   } catch(e: unknown) {
     // エラー処理
     errOperate(e, event);
   }
 });
 
-// 配信
+// 予約配信
 ipcMain.on('reserve', async(event, arg) => {
   try {
     console.log('reserve mode');
     // 全データ登録
-    console.log(await dbRegistration(arg, true));
-    // 日付用
-    const dateArray: string[] = arg.date.split('-');
-    // 時間用
-    const timeArray: string[] = arg.time.split(':');
-    // 月
-    const month: string = isNaN(Number(dateArray[1])) ? '*' : String(Number(dateArray[1]));
-    // 日
-    const day: string = isNaN(Number(dateArray[2])) ? '*' : String(Number(dateArray[2]));
-    // 時
-    const hour: string = isNaN(Number(timeArray[0])) ? '*' : String(Number(timeArray[0]));
-    // 分
-    const minute: string = isNaN(Number(timeArray[1])) ? '*' : String(Number(timeArray[1]));
+    const dbBdResult: string = await dbBroadcastReg(arg, false);
 
-    // スケジュール予約
-    cron.schedule(`${minute} ${hour} ${day} ${month} *`, async() => {
-      // LINE配信
-      console.log(await sendLineMessage(arg));
-    });
-    console.log(`running on ${month}/${day} ${hour}:${minute}`);
-    // ジャンル一覧返し
-    event.sender.send('reserve_register_finish', '');
+    // 成功
+    if (dbBdResult == 'success') {
+      // 日付用
+      const dateArray: string[] = arg.date.split('-');
+      // 時間用
+      const timeArray: string[] = arg.time.split(':');
+      // 月
+      const month: string = isNaN(Number(dateArray[1])) ? '*' : String(Number(dateArray[1]));
+      // 日
+      const day: string = isNaN(Number(dateArray[2])) ? '*' : String(Number(dateArray[2]));
+      // 時
+      const hour: string = isNaN(Number(timeArray[0])) ? '*' : String(Number(timeArray[0]));
+      // 分
+      const minute: string = isNaN(Number(timeArray[1])) ? '*' : String(Number(timeArray[1]));
+
+      // スケジュール予約
+      cron.schedule(`${minute} ${hour} ${day} ${month} *`, async() => {
+        // LINE配信
+        const lineResult: resultType[] = await sendLineMessage(arg);
+        // DB登録
+        const dbUserResult: string = await dbTargetuserReg(lineResult);
+
+        // 結果
+        if (dbUserResult == 'success') {
+          // 通知送付
+          event.sender.send('register_finish', '');
+          console.log(`running on ${month}/${day} ${hour}:${minute}`);
+
+        } else {
+          // 通知送付
+          event.sender.send('error', dbUserResult);
+        }
+      });
+      
+    } else {
+      // エラー返し
+      event.sender.send('error', dbBdResult);
+    }
+
+  } catch(e: unknown) {
+    // エラー処理
+    errOperate(e, event);
+  }
+});
+
+// 削除
+ipcMain.on('delete', async(event, arg) => {
+  try {
+    console.log('delete mode');
+    // オプション
+    const options: Electron.MessageBoxSyncOptions = {
+      type: 'warning', // タイプ
+      message: '警告', // メッセージタイトル
+      buttons: ['OK', 'Cancel'], // ボタン
+      cancelId: -1,  // Esc で閉じられたときの戻り値
+      detail: `${arg.name}を削除してよろしいですか？`,  // 説明文
+    };
+    // ダイアログ表示
+    const selected: number = dialog.showMessageBoxSync(options);
+    console.log(selected);
+    // キャンセルなら離脱
+    if (selected == 1 || selected == -1) {
+      // 結果返し
+      event.sender.send('error', '');
+      return false;
+
+    } else {
+      // 対象を使用不可に
+      db.run('UPDATE ? SET usable = ? WHERE id = ?', [arg.table, 0, arg.id]);
+      // 結果返し
+      event.sender.send('delete_finish', '');
+    }
     
 
   } catch(e: unknown) {
@@ -379,13 +609,13 @@ ipcMain.on('reserve', async(event, arg) => {
   }
 });
 
+/* 汎用処理 */
 // 画像選択
 ipcMain.on('upload', async(event, arg) => {
   try {
     console.log('upload mode');
     // 画像ファイルパス取得
     const filepath: string = await getImageFile();
-    console.log(filepath);
     // 画像ファイルパス返し
     event.sender.send(arg, filepath);
 
@@ -403,7 +633,6 @@ ipcMain.on('csv', async(event, _) => {
     let errFlg: boolean;
     // CSVデータ取得
     const result: any = await getCsvData();
-    console.log(result);
 
     // ユーザID一覧返し
     Promise.all(
@@ -442,7 +671,7 @@ ipcMain.on('csv', async(event, _) => {
   }
 });
 
-// エラー表示
+// メッセージ表示
 ipcMain.on('showmessage', async(event, arg) => {
   try {
     console.log('showmessage mode');
@@ -476,13 +705,11 @@ ipcMain.on('showmessage', async(event, arg) => {
         tmpType = 'none';
         tmpTitle = '';
         console.log('out of scope.');
-        break;
     }
     // オプション
     const options: Electron.MessageBoxOptions = {
       type: tmpType, // タイプ
-      title: tmpTitle, // ヘッダ
-      message: arg.title.toString(), // メッセージタイトル
+      message: tmpTitle, // メッセージタイトル
       detail: arg.message,  // 説明文
     };
     // ダイアログ表示
@@ -497,12 +724,14 @@ ipcMain.on('showmessage', async(event, arg) => {
 /*
  汎用関数
 */
-// DB登録
-const dbRegistration = (arg: any, flg: boolean): Promise<string> => {
+// broadcastDB登録
+const dbBroadcastReg = (arg: any, flg: boolean): Promise<string> => {
   return new Promise(async (resolve, reject) => {
     try {
       // 配信時間
       let broadcastTime: string;
+      // 配信名
+      const broadcastname = Number(arg.bdname);
       // プランID
       const planId = Number(arg.plan);
       // チャンネルID
@@ -526,21 +755,70 @@ const dbRegistration = (arg: any, flg: boolean): Promise<string> => {
       
       db.serialize(() => {
         // 全データ登録
-        db.run('INSERT INTO broadcast (plan_id, channel_id, sendtime, usable, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [planId, channelId, broadcastTime, 0, nowFormattedTime, nowFormattedTime]);
+        db.run('INSERT INTO broadcast (broadcastname, plan_id, channel_id, sendtime, usable, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [broadcastname, planId, channelId, broadcastTime, 0, nowFormattedTime, nowFormattedTime]);
         // 直近にINSERTしたデータを取得
         db.get('SELECT * FROM broadcast WHERE rowid = last_insert_rowid()', (_, rows: any)  => {
           // 配信準備
           const stmt: sqlite3.Statement = db.prepare("INSERT INTO targetuser (broadcast_id, userid, usable, created_at, updated_at) VALUES (?, ?, ?, ?, ?)");
-          // 一斉登録
-          arg.users.forEach((usr: any) => {
-            stmt.run([rows.id, usr, 0, nowFormattedTime, nowFormattedTime]);
-          });
+
+          // データあり
+          if (arg.users) {
+            // 一斉登録
+            arg.users.forEach((usr: any) => {
+              // データあり
+              if (usr) {
+                stmt.run([rows.id, usr, 0, nowFormattedTime, nowFormattedTime]);
+              }
+            });
+          }
           // 登録完了
           stmt.finalize();
           console.log('broadcast registration finished');
         });
       });
+      // 戻り値
+      resolve('success');
 
+    } catch(e: unknown) {
+      // エラー型
+      if (e instanceof Error) {
+        // エラー
+        console.log(e);
+        reject(`${e.message}`);
+      }
+    }
+  });
+}
+
+// userDB登録
+const dbTargetuserReg = (arg: any): Promise<string> => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      db.serialize(() => {
+        // 配信準備
+        const stmt: sqlite3.Statement = db.prepare("UPDATE targetuser SET success = ? WHERE userid = ?");
+        // データあり
+        if (arg) {
+          // 結果ループ
+          arg.forEach((ln: any) => {
+            // データあり
+            if (ln) {
+              // 正常データのみ
+              if (ln.result == 'success') {
+                // アップデート処理
+                stmt.run([1, ln.userid]);
+
+              } else {
+                // アップデート処理
+                stmt.run([0, ln.userid]);
+              }
+            }
+          });
+        }
+        // 登録完了
+        stmt.finalize();
+      });
+      // 戻り値
       resolve('success');
 
     } catch(e: unknown) {
@@ -555,7 +833,7 @@ const dbRegistration = (arg: any, flg: boolean): Promise<string> => {
 }
 
 // LINE配信
-const sendLineMessage = (arg: any): Promise<string> => {
+const sendLineMessage = (arg: any): Promise<resultType[]> => {
   return new Promise(async (resolve, reject) => {
     try {
       // プランID
@@ -567,40 +845,55 @@ const sendLineMessage = (arg: any): Promise<string> => {
       db.serialize(() => {
         // トークン
         let token: string;
-        
+
         // 抽出
-        db.all('SELECT * FROM channel WHERE id = ?', [channelId], (_, rows: any) => {
+        db.all('SELECT * FROM channel WHERE id = ?', [channelId], (_, rows1: any) => {
           // トークン
-          token = rows[0].token;
+          token = rows1[0].token;
         });
 
         // 抽出
-        db.all('SELECT * FROM plan WHERE id = ?', [planId], (_, rows: any) => {
-          // 結果表示用配列
-          let resultArray: resultType[];
+        db.all('SELECT * FROM plan WHERE id = ?', [planId], (_, rows2: any) => {
           // タイトル
-          const title: string = rows[0].title;
+          const title: string = rows2[0].title;
           // 本文
-          const content: string = rows[0].text;
+          const content: string = rows2[0].text;
           // 画像URL
-          const imgurl: string = rows[0].imageurl;
+          const imgurl: string = rows2[0].imageurl;
           // LINE登録
-          const lineMethod: string = String(rows[0].linemethod_id);
+          const lineMethod: string = String(rows2[0].linemethod_id);
           // 画像比率(小数点第１位)
-          const imageRatio: number = Number(rows[0].imageratio);
+          const imageRatio: number = Number(rows2[0].imageratio);
 
-          // チャネル一覧返し
-          arg.users.forEach(async(usr: any) => {
-            // メッセージ送信
-            resultArray.push({
-              result: await makeMessage(usr, token, title, content, imgurl, lineMethod, imageRatio),
-              userid: usr,
-            });
-          });
+          // データあり
+          if (arg.users) {
+            resolve(Promise.all(
+              arg.users.map(async(usr: any) => {
+                // データあり
+                if (usr) {
+                  return new Promise(async(resolve, _) => {
+                    // メッセージ
+                    const messageResult: string = await makeMessage(usr, token, title, content, imgurl, lineMethod, imageRatio);
+                    // 結果あり
+                    if (messageResult) {
+                      resolve({
+                        result: messageResult,
+                        userid: usr,
+                      });
+
+                    } else {
+                      // メッセージ送信
+                      resolve({
+                        result: 'error',
+                        userid: usr,
+                      });
+                    }
+                  });
+                }
+              })
+            ));
+          }
         });
-        // return result
-        resolve('success');
-
       });
       
     } catch(e: unknown) {
@@ -614,18 +907,20 @@ const sendLineMessage = (arg: any): Promise<string> => {
   });
 }
 
-// WEBHOOK
+// メッセージ作成
 const makeMessage = (uid: string, token: string, title?: string, contentText?: string, imgurl?: any, planno?: string, ratio?: number): Promise<string> => {
   return new Promise(async (resolve, reject) => {
     try {
+      // 配信内容
+      let dataString: string;
+      // 配信結果
+      let broadcastResult: string;
       // ヘッダ
       const headers: any = {
         'Content-Type': 'application/json', // Content-type
         Authorization: 'Bearer ' + token, // 認証トークン
       };
-      // 配信内容
-      let dataString: string;
-
+     
       // 配信内容により条件分岐
       switch (planno) {
         // テキスト
@@ -641,9 +936,6 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
             }
             ],
           });
-          // 配信
-          console.log(await makeBroadcast(headers, dataString));
-          resolve('success');
           break;
         
         // 画像
@@ -669,9 +961,6 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
               }
             ],
           });
-          // 配信
-          console.log(await makeBroadcast(headers, dataString));
-          resolve('success');
           break;
         
         // 選択肢
@@ -692,9 +981,6 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
               },
             }],
           });
-          // 配信
-          console.log(await makeBroadcast(headers, dataString));
-          resolve('success');
           break;
         
         // カルーセル
@@ -737,14 +1023,21 @@ const makeMessage = (uid: string, token: string, title?: string, contentText?: s
               }
             }]
           });
-          // 配信
-          console.log(await makeBroadcast(headers, dataString));
-          resolve('success');
           break;
 
         default:
+          dataString = '';
           console.log(`Sorry, we are out of ${planno}.`);
-          resolve('error');
+      }
+      // 配信
+      broadcastResult = await makeBroadcast(headers, dataString);
+      
+      // 可否
+      if (broadcastResult == 'success') {
+        resolve('success');
+        
+      } else {
+        reject('error');
       }
 
     } catch(e: unknown) {
@@ -949,24 +1242,6 @@ const getNowTime = (): string => {
   return formatToTimeZone(now, FORMAT, {timeZone: TIME_ZONE_TOKYO});
 }
 
-// Make a new message box and close after n milliseconds
-const tempBox = (options: Electron.MessageBoxOptions, n: number): Promise<void> => {
-  return new Promise(async (resolve, reject) => {
-    // 処理フラグ
-    let resolved: boolean = false;
-    // スレーブ
-    const slave: Electron.BrowserWindow = new BrowserWindow({width: 1, height: 1, show: false});
-    // ダイアログ
-    dialog.showMessageBox(slave, options).then(() => {
-        resolved = true;
-        resolve();
-    }).catch(() => {});
-    await new Promise((res) => setTimeout(res, n));
-    slave.close();
-    if (!resolved) reject();
-  });
-}
-
 // エラー処理
 const errOperate = (e: unknown, event: any) => {
   // エラー型
@@ -974,6 +1249,6 @@ const errOperate = (e: unknown, event: any) => {
     // エラー
     console.log(e);
     // 配信方法一覧返し
-    event.sender.send('showerror', `${e.message})`);
+    event.sender.send('error', `${e.message})`);
   }
 }

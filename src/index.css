@@ -99,6 +99,15 @@ div.buttonarea div#csvfilepath {
 }
 
 /* red buttons */
+.button-6 {
+  background-color: #B6E6CE
+}
+
+.button-6:active {
+  background-color: #A3DFC1;
+}
+
+/* red buttons */
 .button-8 {
   background-color: #FFB2B2;
 }
