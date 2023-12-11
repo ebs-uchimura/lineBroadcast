@@ -16,12 +16,6 @@
       </label>
     </div>
     <div class="cp_iptxt">
-      <h3>タイトル</h3>
-      <label class="ef">
-        <input type="text" name="title" id="title" placeholder="タイトル">
-      </label>
-    </div>
-    <div class="cp_iptxt">
       <h3>ジャンル</h3>
       <div class="cp_ipselect cp_sl01">
         <select id="genre-select">
@@ -32,14 +26,15 @@
     <div class="cp_iptxt">
       <h3>配信タイプ</h3>
       <div class="cp_ipselect cp_sl01">
-        <select id="type-select" onchange="typechange(this);">
+        <select id="linemethod-select" onchange="linemethodchange(this);">
           <option value="">--配信タイプ選択--</option>
         </select>
       </div>
     </div>
     <div id="imagearea">
       <div id="imgbtn" class="buttonarea">
-        <button class="button-g" value="upload" onclick="upload('image')">画像選択</button>
+        <button class="button-g" value="upload" onclick="upload()">画像選択</button>
+        <button class="button-g button-8" value="clear" onclick="clearUpload()">画像クリア</button>
       </div>
       <div id="imagepath"></div>
     </div>
@@ -49,7 +44,7 @@
       </label>
     </div>
     <div id="regbtn" class="buttonarea">
-      <button class="button-g button-8" value="register" onclick="register()">プラン登録</button>
+      <button class="button-g button-4" value="register" onclick="register()">プラン登録</button>
     </div>
     <h2>プラン削除</h2>
     <div class="cp_iptxt">
@@ -64,29 +59,25 @@
       <button class="button-g button-8" value="delete" onclick="deleteit('plan')">プラン削除</button>
     </div>
     <div class="buttonarea">
-      <button class="button-g button-4" value="back" onclick="history.back()">戻る</button>
+      <button class="button-g" value="back" onclick="history.back()">戻る</button>
     </div>
     <script>
       // デフォルトのサニタイザー
       const sanitizer = new Sanitizer();
       // プラン名
       const plannameDom = document.getElementById('planname');
-      // プラン選択
-      const planselectDom = document.getElementById('plan-select');
-      // 配信タイトル
-      const titleDom = document.getElementById('title');
-      // 配信ジャンル
-      const genreDom = document.getElementById('genre-select');
-      // 配信タイプ
-      const typeDom = document.getElementById('type-select');
       // 配信テキスト
       const textDom = document.getElementById('plantext');
+      // プラン選択
+      const planselectDom = document.getElementById('plan-select');
+      // 配信ジャンル
+      const genreselectDom = document.getElementById('genre-select');
+      // 配信タイプ
+      const linemethodselectDom = document.getElementById('linemethod-select');
       // 配信画像URL
       const imageurlDom = document.getElementById('imagepath');
       // 画像ボタンURL
       const imagebtnDom = document.getElementById('imagearea');
-      // 選択プラン
-      const planId = plannameDom.value;
 
        // プラン登録完了
        window.api.on("register_finish", _ => {
@@ -100,12 +91,13 @@
         window.api.send("showmessage", messageOption);
         // フォーム初期化
         plannameDom.value = "";
-        titleDom.value = "";
         textDom.value = "";
         imageurlDom.innerHTML = "";
-        genreDom.options[0].selected = true;
-        typeDom.options[0].selected = true;
+        genreselectDom.options[0].selected = true;
+        linemethodselectDom.options[0].selected = true;
         planselectDom.options[0].selected = true;
+        // 戻る
+        history.back();
       });
 
       // プラン削除完了
@@ -121,12 +113,13 @@
         window.api.send("showmessage", messageOption);
         // フォーム初期化
         plannameDom.value = "";
-        titleDom.value = "";
         textDom.value = "";
         imageurlDom.innerHTML = "";
-        genreDom.options[0].selected = true;
-        typeDom.options[0].selected = true;
+        genreselectDom.options[0].selected = true;
+        linemethodselectDom.options[0].selected = true;
         planselectDom.options[0].selected = true;
+        // 戻る
+        history.back()
       });
 
       // ジャンル
@@ -141,7 +134,7 @@
             // ジャンル代入
             option.textContent  = obj.genrename;
             // セレクトに追加
-            genreDom.appendChild(option);
+            genreselectDom.appendChild(option);
           });
           
         } catch(e) {
@@ -162,7 +155,7 @@
             // ジャンル代入
             option.textContent  = obj.linemethodname;
             // セレクトに追加
-            typeDom.appendChild(option);
+            linemethodselectDom.appendChild(option);
           });
           
         } catch(e) {
@@ -198,13 +191,31 @@
         imageurlDom.innerHTML = arg;
       });
 
-     
+      // データなし
+      window.api.on('notexists', arg => {
+        // メッセージオプション
+        const messageOption = {
+          title: 'エラー',
+          message: arg,
+          type: 'fatal',
+        }
+        // ポップアップ表示
+        window.api.send('showmessage', messageOption);
+        // 戻る
+        history.back()
+      });
 
       // エラー表示
       window.api.on("error", arg => {
         try {
-          // コンソール表示
-          console.log(arg);
+          // メッセージオプション
+          const messageOption = {
+            title: 'エラー',
+            message: arg,
+            type: 'fatal',
+          }
+          // ポップアップ表示
+          window.api.send('showmessage', messageOption);
           
         } catch(e) {
           // エラー処理
@@ -225,10 +236,22 @@
       }
 
       // アップロード
-      const upload = (str) => {
+      const upload = () => {
         try {
           // 配信モード
-          window.api.send("upload", str);
+          window.api.send("upload");
+
+        } catch(e) {
+          // エラー処理
+          window.api.send("error", e);
+        }
+      }
+
+      // アップロードクリア
+      const clearUpload = () => {
+        try {
+          // ファイルパスクリア
+          imageurlDom.innerHTML = "";
 
         } catch(e) {
           // エラー処理
@@ -251,24 +274,19 @@
           let errorArray = [];
           // プラン名
           planname = plannameDom.value;
-          // 配信タイトル
-          title = titleDom.value;
           // 配信テキスト
           text = textDom.value;
           // ジャンル
-          const genre = genreDom.value;
+          const genre = genreselectDom.value;
           // 選択配信タイプ
-          const type = typeDom.value;
+          const linemethod = linemethodselectDom.value;
           // 配信画像URL
           const imageurl = imageurlDom.innerHTML;
           // サニタイズ処理
           plannameDom.setHTML(planname, { sanitizer });
-          titleDom.setHTML(title, { sanitizer });
           textDom.setHTML(text, { sanitizer });
           // プラン名(再取得)
           planname = plannameDom.value;
-          // 配信タイトル(再取得)
-          title = titleDom.value;
           // 配信テキスト(再取得)
           text = textDom.value;
 
@@ -278,18 +296,13 @@
             errorArray.push("プラン名が空欄です");
             errorflg = true;
           }
-          // タイトル
-          if (title == "") {
-            errorArray.push("タイトルが空欄です");
-            errorflg = true;
-          }
           // ジャンル
-          if (genreDom.options[0].selected) {
+          if (genreselectDom.options[0].selected) {
             errorArray.push("ジャンルを選択してください");
             errorflg = true;
           }
           // 配信タイプ
-          if (typeDom.options[0].selected) {
+          if (linemethodselectDom.options[0].selected) {
             errorArray.push("配信タイプを選択してください");
             errorflg = true;
           }
@@ -304,8 +317,7 @@
             // 送付内容
             const sendObj = {
               planname: planname,
-              title: title,
-              type: type,
+              linemethod: linemethod,
               text: text,
               genre: genre,
               imageurl: imageurl,
@@ -332,14 +344,21 @@
       }
 
       // プラン削除
-      const deleteit = (table) => {
+      const deleteit = table => {
         try {
           // エラーフラグ
           let errorflg = false;
+          // 選択インデックス
+          const idx = planselectDom.selectedIndex;
+          // オプション値
+          const planId = planselectDom.options[idx].value;
+          // オプション値
+          const option = planselectDom.options[idx].innerHTML;
           // 送付内容
           const sendObj = {
             table: table,
             id: planId,
+            name: option,
           }
           // 削除プラン
           if (planselectDom.options[0].selected) {
@@ -349,7 +368,7 @@
           // エラーなし
           if (!errorflg) {
             // 配信モード
-            window.api.send("delete", planId);
+            window.api.send("delete", sendObj);
             
           } else {
             // メッセージオプション
@@ -369,7 +388,7 @@
       }
 
       // セレクトボックス変更
-      const typechange = obj => {
+      const linemethodchange = obj => {
         // 選択インデックス
         const idx = obj.selectedIndex;
         // 値

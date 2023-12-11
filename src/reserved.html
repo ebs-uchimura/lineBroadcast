@@ -16,10 +16,10 @@
       </label>
     </div>
     <div class="cp_iptxt">
-      <h3>チャネル</h3>
+      <h3>チャンネル</h3>
       <div class="cp_ipselect cp_sl01">
         <select id="channel-select" required>
-          <option value="">--チャネル選択--</option>
+          <option value="">--チャンネル選択--</option>
         </select>
       </div>
     </div>
@@ -46,14 +46,15 @@
       </div>
     </div>
     <div id="csvfile" class="buttonarea">
-      <button class="button-g" value="reader" onclick="readCSV()">顧客番号CSV読込</button>
+      <button class="button-g" value="reader" onclick="readCSV()">ユーザID CSV読込</button>
+      <button class="button-g button-8" value="reader" onclick="clearCSV()">ユーザID クリア</button>
       <div id="csvfilepath"></div>
     </div>
     <div id="reservation" class="buttonarea">
-      <button id="" class="button-g button-8" value="reserve" onclick="reserve()">LINE配信予約</button>
+      <button id="" class="button-g button-4" value="reserve" onclick="reserve()">LINE配信予約</button>
     </div>
     <div class="buttonarea">
-      <button class="button-g button-4" value="back" onclick="history.back()">戻る</button>
+      <button class="button-g" value="back" onclick="history.back()">戻る</button>
     </div>
     <script>
       // デフォルトのサニタイザー
@@ -61,13 +62,13 @@
       // 配信名
       const broadcastnameDom = document.getElementById('broadcastname');
       // プラン名
-      const plannameDom = document.getElementById('plan-select');
+      const planselectDom = document.getElementById('plan-select');
       // 選択チャンネル
-      const channelDom = document.getElementById('channel-select');
+      const channelselectDom = document.getElementById('channel-select');
       // 配信日
-      const dateDom = document.getElementById('date');
+      const senddateDom = document.getElementById('date');
       // 配信時刻
-      const timeDom = document.getElementById('time');
+      const sendtimeDom = document.getElementById('time');
       // CSVファイル
       const csvfileDom = document.getElementById('csvfilepath');
 
@@ -82,11 +83,12 @@
         // ポップアップ表示
         window.api.send("showmessage", messageOption);
         // フォーム初期化
-        dateDom.value = "";
-        timeDom.value = "00:00";
+        broadcastnameDom.value = "";
+        senddateDom.value = "";
+        sendtimeDom.value = "00:00";
         csvfileDom.innerHTML = "";
-        channelDom.options[0].selected = true;
-        plannameDom.options[0].selected = true;
+        channelselectDom.options[0].selected = true;
+        planselectDom.options[0].selected = true;
       });
 
       // エラー発生
@@ -113,7 +115,7 @@
             // プラン代入
             option.textContent  = `${obj.id}: ${obj.channelname}`;
             // セレクトに追加
-            channelDom.appendChild(option);
+            channelselectDom.appendChild(option);
           });
 
         } catch(e) {
@@ -134,7 +136,7 @@
             // プラン代入
             option.textContent  = `${obj.id}: ${obj.planname}`;
             // セレクトに追加
-            plannameDom.appendChild(option);
+            planselectDom.appendChild(option);
           });
 
         } catch(e) {
@@ -184,30 +186,44 @@
           window.api.send("error", e);
         }
       }
+      
+      // CSVクリアモード
+      const clearCSV = () => {
+        try {
+          // localStorageクリア
+          localStorage.clear();
+          // ファイルパス表示
+          csvfileDom.innerHTML = "";
+
+        } catch(e) {
+          // エラー処理
+          window.api.send("error", e);
+        }
+      }
 
       // 予約配信モード
       const reserve = () => {
         try {
           // 配信名
           let broadcastname;
-          // ユーザ一覧
-          const serializedArray = localStorage.getItem('userArray');
           // エラーフラグ
           let errorflg;
           // エラーメッセージ
           let errorArray = [];
           // エラーメッセージ
           let userArray = [];
+          // ユーザ一覧
+          const serializedArray = localStorage.getItem('userArray');
+          // 選択チャンネル
+          const channel = channelselectDom.value;
+          // 選択プラン
+          const plan = planselectDom.value;
+          // 配信日
+          const date = senddateDom.value;
+          // 配信時間
+          const time = sendtimeDom.value;
           // 配信名
           broadcastname = broadcastnameDom.value;
-          // 選択チャンネル
-          const channel = channelDom.value;
-          // 選択プラン
-          const plan = plannameDom.value;
-          // 配信日
-          const date = dateDom.value;
-          // 配信時間
-          const time = timeDom.value + ':00';
           // サニタイズ処理
           broadcastnameDom.setHTML(broadcastname, { sanitizer });
           // 配信名(再取得)
@@ -224,17 +240,52 @@
             userArray = JSON.parse(serializedArray);
           }
 
-          // 予約オプション
-          const reserveOption = {
-            bdname: broadcastname, // 配信名
-            channel: channel, // 選択チャンネル
-            plan: plan, // 選択プラン
-            date: date, // 配信日
-            time: time, // 配信時間
-            users: userArray, // ユーザ一覧
+          /* バリデーション */
+          // 配信名
+          if (broadcastname == "") {
+            errorArray.push("配信名が空欄です");
+            errorflg = true;
           }
-          // 予約配信モード
-          window.api.send("reserve", reserveOption);
+          // チャネル
+          if (channelselectDom.options[0].selected) {
+            errorArray.push("チャネルを選択してください");
+            errorflg = true;
+          }
+          // プラン
+          if (planselectDom.options[0].selected) {
+            errorArray.push("プランを選択してください");
+            errorflg = true;
+          }
+          // 日付or時間
+          if (date == "" || time == "") {
+            errorArray.push("配信時間を選択してください");
+            errorflg = true;
+          }
+
+          // エラーなし
+          if (!errorflg) {
+            // 予約オプション
+            const reserveOption = {
+              bdname: broadcastname, // 配信名
+              channel: channel, // 選択チャンネル
+              plan: plan, // 選択プラン
+              date: date, // 配信日
+              time: time, // 配信時間
+              users: userArray, // ユーザ一覧
+            }
+            // 予約配信モード
+            window.api.send("reserve", reserveOption);
+
+          } else {
+            // メッセージオプション
+            const messageOption = {
+              title: "エラー",
+              message: errorArray.join("|"),
+              type: "error",
+            }
+            // エラー表示
+            window.api.send("showmessage", messageOption);
+          }
 
         } catch(e) {
           // エラー処理

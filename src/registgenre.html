@@ -16,7 +16,7 @@
       </label>
     </div>
     <div id="regbtn" class="buttonarea">
-      <button class="button-g" value="register" onclick="register()">ジャンル登録</button>
+      <button class="button-g button-4" value="register" onclick="register()">ジャンル登録</button>
     </div>
     <h2>ジャンル削除</h2>
     <div class="cp_iptxt">
@@ -31,7 +31,7 @@
       <button class="button-g button-8" value="delete" onclick="deleteit('genre')">ジャンル削除</button>
     </div>
     <div class="buttonarea">
-      <button class="button-g button-4" value="back" onclick="history.back()">戻る</button>
+      <button class="button-g" value="back" onclick="history.back()">戻る</button>
     </div>
     <script>
       // デフォルトのサニタイザー
@@ -54,6 +54,8 @@
         // フォーム初期化
         genrenameDom.value = "";
         genreselectDom.options[0].selected = true;
+        // 戻る
+        history.back();
       });
 
       // ジャンル削除完了
@@ -69,6 +71,29 @@
         // フォーム初期化
         genrenameDom.value = "";
         genreselectDom.options[0].selected = true;
+        // 戻る
+        history.back();
+      });
+
+      // ジャンル
+      window.api.on("genreMasterlist", arg => {
+        try {
+          // ジャンル自動生成
+          arg.forEach((obj, idx) => {
+            // オプションタグ生成
+            const option = document.createElement('option');
+            // 値代入
+            option.value = String(obj.id);
+            // ジャンル代入
+            option.textContent  = `${obj.id}: ${obj.genrename}`;
+            // セレクトに追加
+            genreselectDom.appendChild(option);
+          });
+          
+        } catch(e) {
+          // エラー処理
+          console.log(e);
+        }
       });
 
       // ページ遷移
@@ -128,13 +153,20 @@
         }
       }
 
-      // プラン削除
-      const deleteit = (table) => {
+      // ジャンル削除
+      const deleteit = table => {
         try {
+          // 選択インデックス
+          const idx = genreselectDom.selectedIndex;
+          // 値
+          const genreId = genreselectDom.options[idx].value;
+          // オプション値
+          const option = genreselectDom.options[idx].innerHTML;
           // 送付内容
           const sendObj = {
             table: table,
-            id: planId,
+            id: genreId,
+            name: option,
           }
           // 削除モード
           window.api.send("delete", sendObj);

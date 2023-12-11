@@ -10,6 +10,7 @@
     /* Type Checking */
     "strict": true,
     /* Completeness */
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true
   }
 }

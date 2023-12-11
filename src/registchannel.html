@@ -22,7 +22,7 @@
       </label>
     </div>
     <div id="regbtn" class="buttonarea">
-      <button class="button-g" value="register" onclick="register()">チャネル登録</button>
+      <button class="button-g button-4" value="register" onclick="register()">チャネル登録</button>
     </div>
     <h2>チャネル削除</h2>
     <div class="cp_iptxt">
@@ -37,7 +37,7 @@
       <button class="button-g button-8" value="delete" onclick="deleteit('channel')">チャネル削除</button>
     </div>
     <div class="buttonarea">
-      <button class="button-g button-4" value="back" onclick="history.back()">戻る</button>
+      <button class="button-g" value="back" onclick="history.back()">戻る</button>
     </div>
     <script>
       // デフォルトのサニタイザー
@@ -48,8 +48,6 @@
       const channelselectDom = document.getElementById('channel-select');
       // トークン
       const tokenDom = document.getElementById('token');
-      // 選択チャネル
-      const channelId = channelselectDom.value;
 
       // ジャンル登録完了
       window.api.on("register_finish", arg => {
@@ -62,8 +60,10 @@
         // メッセージ送付
         window.api.send("showmessage", messageOption);
         // フォーム初期化
-        genrenameDom.value = "";
-        genreselectDom.options[0].selected = true;
+        channelnameDom.value = "";
+        channelselectDom.options[0].selected = true;
+        // 戻る
+        history.back();
       });
 
       // ジャンル削除完了
@@ -77,8 +77,10 @@
         // メッセージ送付
         window.api.send("showmessage", messageOption);
         // フォーム初期化
-        genrenameDom.value = "";
-        genreselectDom.options[0].selected = true;
+        channelnameDom.value = "";
+        channelselectDom.options[0].selected = true;
+        // 戻る
+        history.back();
       });
 
       // エラー発生
@@ -107,50 +109,6 @@
             // セレクトに追加
             channelselectDom.appendChild(option)
           });
-
-        } catch(e) {
-          // エラー処理
-          console.log(e);
-        }
-      });
-
-      // チャネル登録完了
-      window.api.on("register_finish", arg => {
-        try {
-          // メッセージオプション
-          const messageOption = {
-            title: "登録完了",
-            message: "登録が完了しました",
-            type: "info",
-          }
-          // メッセージ送付
-          window.api.send("showmessage", messageOption);
-          // フォーム初期化
-          channelnameDom.value = "";
-          tokenDom.value = "";
-          channelselectDom.options[0].selected = true;
-
-        } catch(e) {
-          // エラー処理
-          console.log(e);
-        }
-      });
-
-      // チャネル削除完了
-      window.api.on("delete_finish", arg => {
-        try {
-          // メッセージオプション
-          const messageOption = {
-            title: "削除完了",
-            message: "チャネル削除が完了しました",
-            type: "info",
-          }
-          // メッセージ送付
-          window.api.send("showmessage", messageOption);
-          // フォーム初期化
-          channelnameDom.value = "";
-          tokenDom.value = "";
-          channelselectDom.options[0].selected = true;
 
         } catch(e) {
           // エラー処理
@@ -233,15 +191,22 @@
         }
       }
 
-      // プラン削除
-      const deleteit = (table) => {
+       // プラン削除
+       const deleteit = table => {
         try {
+          // 選択インデックス
+          const idx = channelselectDom.selectedIndex;
+          // 値
+          const channelId = channelselectDom.options[idx].value;
+          // オプション値
+          const option = channelselectDom.options[idx].innerHTML;
           // 送付内容
           const sendObj = {
             table: table,
             id: channelId,
+            name: option,
           }
-          // 配信モード
+          // 削除モード
           window.api.send("delete", sendObj);
 
         } catch(e) {
