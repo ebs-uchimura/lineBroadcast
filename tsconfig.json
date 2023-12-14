@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es2016",
+    "target": "es2018",
     /* Modules */
     "module": "commonjs",
     "rootDir": "src",
@@ -12,5 +12,13 @@
     /* Completeness */
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true
-  }
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "node_modules",
+    ".gitignore",
+    ".git"
+  ],
 }

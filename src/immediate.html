@@ -65,6 +65,7 @@
         // ポップアップ表示
         window.api.send('showmessage', messageOption);
         // フォーム初期化
+        broadcastnameDom.value = '';
         csvfileDom.innerHTML = '';
         channelselectDom.options[0].selected = true;
         planselectDom.options[0].selected = true;
@@ -212,7 +213,6 @@
           } else {
             // JSON文字列変換
             userArray = JSON.parse(serializedArray);
-            console.log(userArray);
           }
 
           /* バリデーション */
