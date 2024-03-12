@@ -1,0 +1,38 @@
+{
+  "name": "linebroadcast-app",
+  "productName": "linebroadcast-app",
+  "version": "1.0.0",
+  "description": "linebroadcast application",
+  "main": "build/index.js",
+  "scripts": {
+    "build": "tsc",
+    "build:win": "tsc && chcp 65001 && electron-packager . --app-version=1.0.0 --overwrite",
+    "start": "tsc && chcp 65001 && electron ."
+  },
+  "keywords": [],
+  "author": {
+    "name": "ebs-uchimura",
+    "email": "uchimura@ebisu-do.jp"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@types/node": "^20.8.9",
+    "@types/node-cron": "^3.0.11",
+    "@types/ssh2-sftp-client": "^9.0.2",
+    "csv-parse": "^5.5.3",
+    "dotenv": "^16.3.1",
+    "electron-log": "^5.0.1",
+    "https": "^1.0.0",
+    "image-size": "^1.0.2",
+    "mysql2": "^3.6.5",
+    "mysql2-timeout-additions": "^1.1.2",
+    "node-cron": "^3.0.3",
+    "path": "^0.12.7",
+    "ssh2-sftp-client": "^9.1.0",
+    "typescript": "^5.2.2"
+  },
+  "devDependencies": {
+    "electron": "^27.1.2",
+    "electron-packager": "^17.1.2"
+  }
+}

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>LINE自動配信ツール</title>
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';">
+  <link rel="stylesheet" href="index.css">
+  <link rel="stylesheet" href="form.css">
+</head>
+
+<body>
+  <h2>即時LINE配信</h2>
+  <div class="cp_iptxt">
+    <h3>配信名</h3>
+    <label class="ef">
+      <input type="text" name="broadcastname" id="broadcastname" placeholder="配信名">
+    </label>
+  </div>
+  <div class="cp_iptxt">
+    <h3>チャンネル</h3>
+    <div class="cp_ipselect cp_sl01">
+      <select id="channel-select" required>
+        <option value="">--チャンネル選択--</option>
+      </select>
+    </div>
+  </div>
+  <div class="cp_iptxt">
+    <h3>プラン</h3>
+    <div class="cp_ipselect cp_sl01">
+      <select id="plan-select">
+        <option value="">--プラン選択--</option>
+      </select>
+    </div>
+  </div>
+  <div id="csvfile" class="buttonarea">
+    <button class="button-g" value="reader" onclick="readCSV()">ユーザID CSV読込</button>
+    <button class="button-g button-8" value="reader" onclick="clearCSV()">ユーザID クリア</button>
+    <div id="csvfilepath"></div>
+  </div>
+  <div id="reservation" class="buttonarea">
+    <button class="button-g button-4" value="broadcast" onclick="broadcast()">今すぐLINE配信</button>
+  </div>
+  <div class="buttonarea">
+    <button class="button-g" value="back" onclick="history.back()">戻る</button>
+  </div>
+  <div class="progressarea">
+    <div>成功:<span id="success"></span>/<span id="successtotal"></span></div>
+    <div>失敗:<span id="fail"></span>/<span id="failtotal"></span></div>
+  </div>
+  <script>
+    // デフォルトのサニタイザー
+    const sanitizer = new Sanitizer();
+    // 配信名
+    const broadcastnameDom = document.getElementById('broadcastname');
+    // チャネル
+    const channelselectDom = document.getElementById('channel-select');
+    // プラン名
+    const planselectDom = document.getElementById('plan-select');
+    // CSVファイル
+    const csvfileDom = document.getElementById('csvfilepath');
+    // 進捗表示
+    const successDom = document.getElementById('success');
+    // 進捗表示
+    const failDom = document.getElementById('fail');
+    // 合計表示
+    const successtotalDom = document.getElementById('successtotal');
+    // 合計表示
+    const failtotalDom = document.getElementById('failtotal');
+
+    // プラン登録完了
+    window.api.on('register_finish', _ => {
+      // メッセージオプション
+      const messageOption = {
+        title: '配信完了',
+        message: '配信が完了しました',
+        type: 'info',
+      }
+      // ポップアップ表示
+      window.api.send('showmessage', messageOption);
+      // フォーム初期化
+      broadcastnameDom.value = '';
+      csvfileDom.innerHTML = '';
+      channelselectDom.options[0].selected = true;
+      planselectDom.options[0].selected = true;
+    });
+
+    // エラー発生
+    window.api.on('error', arg => {
+      // メッセージオプション
+      const messageOption = {
+        title: 'エラー',
+        message: arg,
+        type: 'fatal',
+      }
+      // ポップアップ表示
+      window.api.send('showmessage', messageOption);
+    });
+
+    // チャネル
+    window.api.on("channelMasterllist", arg => {
+      try {
+        // チャネル自動生成
+        arg.forEach((obj, idx) => {
+          // オプションタグ生成
+          const option = document.createElement('option');
+          // 値代入
+          option.value = String(obj.id);
+          // 表示名
+          option.textContent = `${obj.id}: ${obj.channelname}`;
+          // セレクトに追加
+          channelselectDom.appendChild(option);
+        });
+
+      } catch (e) {
+        // エラー処理
+        console.log(e);
+      }
+    });
+
+    // プラン
+    window.api.on("planMasterllist", arg => {
+      try {
+        // プラン自動生成
+        arg.forEach((obj, idx) => {
+          // オプションタグ生成
+          const option = document.createElement('option');
+          // 値代入
+          option.value = String(obj.id);
+          // 表示名
+          option.textContent = `${obj.id}: ${obj.planname}`;
+          // セレクトに追加
+          planselectDom.appendChild(option)
+        });
+
+      } catch (e) {
+        // エラー処理
+        console.log(e);
+      }
+    });
+
+    // ユーザ
+    window.api.on("usersCsvlist", arg => {
+      try {
+        // ユーザ一覧
+        const userArray = arg.record.flat();
+        // JSON文字列変換
+        const serializedArray = JSON.stringify(userArray);
+        // localStorage保存
+        localStorage.setItem('userArray', serializedArray);
+        // ファイルパス表示
+        csvfileDom.innerHTML = arg.filename;
+
+      } catch (e) {
+        // エラー処理
+        console.log(e);
+      }
+    });
+
+    // 合計数
+    window.api.on('total', arg => {
+      // 成功合計数
+      successtotalDom.innerHTML = arg;
+      // 失敗合計数
+      failtotalDom.innerHTML = arg;
+    });
+
+    // 成功進捗更新
+    window.api.on('success', arg => {
+      console.log(arg);
+      // 成功数
+      successDom.innerHTML = arg;
+    });
+
+    // 失敗進捗更新
+    window.api.on('fail', arg => {
+      console.log(arg);
+      // 失敗数
+      failDom.innerHTML = arg;
+    });
+
+    // ページ遷移
+    const transfer = channel => {
+      try {
+        // 配信ページ遷移
+        window.api.send("page", channel);
+
+      } catch (e) {
+        // エラー処理
+        console.log(e);
+      }
+    }
+
+    // CSVモード
+    const readCSV = () => {
+      try {
+        // CSVモード
+        window.api.send("csv");
+
+      } catch (e) {
+        // エラー処理
+        window.api.send("error", e);
+      }
+    }
+
+    // CSVクリアモード
+    const clearCSV = () => {
+      try {
+        // localStorageクリア
+        localStorage.clear();
+        // ファイルパス表示
+        csvfileDom.innerHTML = "";
+
+      } catch (e) {
+        // エラー処理
+        window.api.send("error", e);
+      }
+    }
+
+    // 即時配信モード
+    const broadcast = () => {
+      try {
+        // 配信名
+        let broadcastname;
+        // エラーフラグ
+        let errorflg = false;
+        // エラーメッセージ
+        let errorArray = [];
+        // エラーメッセージ
+        let userArray = [];
+        // ユーザ一覧
+        const serializedArray = localStorage.getItem('userArray');
+        // 選択チャンネル
+        const channel = channelselectDom.value;
+        // 選択プラン
+        const planId = planselectDom.value;
+        // 配信名
+        broadcastname = broadcastnameDom.value;
+        // サニタイズ処理
+        broadcastnameDom.setHTML(broadcastname, { sanitizer });
+        // 配信名(再取得)
+        broadcastname = broadcastnameDom.value;
+
+        // ユーザなし
+        if (!serializedArray) {
+          errorArray.push("顧客CSVを選択してください");
+          errorflg = true;
+
+        } else {
+          // JSON文字列変換
+          userArray = JSON.parse(serializedArray);
+        }
+
+        /* バリデーション */
+        // 配信名
+        if (broadcastname == "") {
+          errorArray.push("配信名が空欄です");
+          errorflg = true;
+        }
+        // チャネル
+        if (channelselectDom.options[0].selected) {
+          errorArray.push("チャネルを選択してください");
+          errorflg = true;
+        }
+        // プラン
+        if (planselectDom.options[0].selected) {
+          errorArray.push("プランを選択してください");
+          errorflg = true;
+        }
+
+        // エラーなし
+        if (!errorflg) {
+          // 送付内容
+          const broadcastObj = {
+            bdname: broadcastname, // 配信名
+            channel: channel, // 選択チャンネル
+            plan: planId, // 選択プラン
+            users: userArray, // ユーザ一覧
+          }
+          // 配信モード
+          window.api.send("broadcast", broadcastObj);
+
+        } else {
+          // メッセージオプション
+          const messageOption = {
+            title: "エラー",
+            message: errorArray.join("|"),
+            type: "error",
+          }
+          // エラー表示
+          window.api.send("showmessage", messageOption);
+        }
+
+      } catch (e) {
+        // エラー処理
+        window.api.send("error", e);
+      }
+    }
+  </script>
+</body>
+
+</html>

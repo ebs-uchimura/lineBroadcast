@@ -1,0 +1,117 @@
+/*
+/* index.css
+*/
+
+@charset "utf-8";
+
+/* general */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
+    Arial, sans-serif;
+  margin: auto;
+  max-width: 38rem;
+  padding: 2rem;
+}
+
+h3 {
+	margin-bottom: 5px;
+	font-size: 1rem;
+	color: #ccc;
+}
+
+::placeholder {
+	color: #ccc;
+	font-size: 0.8em;
+}
+
+/* area */
+div.buttonarea {
+  margin: 30px 0;
+}
+
+div.buttonarea button {
+  height: 50px;
+}
+
+div.buttonarea div {
+  margin: 25px 0;
+}
+
+div.buttonarea div#csvfilepath {
+  margin: 20px;
+  font-size: 0.8rem;
+}
+
+/* blue buttons */
+.button-g {
+  width: auto;
+  margin-left: 10px;
+  align-items: center;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  /*border-radius: .25rem;*/
+  box-shadow: rgba(0, 0, 0, 0.02) 0 1px 3px 0;
+  box-sizing: border-box;
+  color: rgba(0, 0, 0, 0.85);
+  cursor: pointer;
+  display: inline-flex;
+  font-family: system-ui, -apple-system, system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  justify-content: center;
+  line-height: 1.25;
+  min-height: 3rem;
+  padding: calc(.875rem - 1px) calc(1.5rem - 1px);
+  position: relative;
+  text-decoration: none;
+  transition: all 250ms;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  vertical-align: baseline;
+
+}
+
+.button-g:hover,
+.button-g:focus {
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: rgba(0, 0, 0, 0.1) 0 4px 12px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.button-g:hover {
+  transform: translateY(-1px);
+}
+
+.button-g:active {
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: rgba(0, 0, 0, 0.06) 0 2px 4px;
+  color: rgba(0, 0, 0, 0.65);
+  transform: translateY(0);
+}
+
+/* blue buttons */
+.button-4 {
+  background-color: #CCE6FF;
+}
+
+.button-4:active {
+  background-color: #B3D9FF;
+}
+
+/* red buttons */
+.button-6 {
+  background-color: #B6E6CE
+}
+
+.button-6:active {
+  background-color: #A3DFC1;
+}
+
+/* red buttons */
+.button-8 {
+  background-color: #FFB2B2;
+}
+
+.button-8:active {
+  background-color: #FFA5A5;
+}

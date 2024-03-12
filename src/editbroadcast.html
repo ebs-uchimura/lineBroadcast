@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>LINE自動配信ツール</title>
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';">
+  <link rel="stylesheet" href="index.css">
+</head>
+<link rel="stylesheet" href="form.css">
+
+<body>
+  <h2>配信予約編集</h2>
+  <div class="cp_iptxt">
+    <h3>配信予約</h3>
+    <div class="cp_ipselect cp_sl01">
+      <select id="broadcast-select" onchange="broadcastchange(this);">
+        <option value="">--配信予約選択--</option>
+      </select>
+    </div>
+  </div>
+  <div class="cp_iptxt">
+    <h3>チャネル</h3>
+    <div class="cp_ipselect cp_sl01">
+      <select id="channel-select" required>
+        <option value="">--チャネル選択--</option>
+      </select>
+    </div>
+  </div>
+  <div class="cp_iptxt">
+    <h3>プラン</h3>
+    <div class="cp_ipselect cp_sl01">
+      <select id="plan-select">
+        <option value="">--プラン選択--</option>
+      </select>
+    </div>
+  </div>
+  <div class="dialogs">
+    <h3>配信日選択</h3>
+    <div class="date01">
+      <label class="modal datelabel" for="date">
+        <input type="date" id="date" name="配信日" value="">
+      </label>
+    </div>
+    <h3>配信時刻選択</h3>
+    <div class="time01">
+      <label class="modal timelabel" for="time">
+        <input type="time" id="time" name="配信時刻" value="00:00">
+      </label>
+    </div>
+  </div>
+  <div id="csvfile" class="buttonarea">
+    <button class="button-g" value="reader" onclick="readCSV()">ユーザID CSV読込</button>
+    <button class="button-g button-8" value="reader" onclick="clearCSV()">ユーザID クリア</button>
+    <div id="csvfilepath"></div>
+  </div>
+  <div id="editbtn" class="buttonarea">
+    <button class="button-g button-4" value="edit" onclick="edit()">配信編集</button>
+  </div>
+  <h2>配信予約削除</h2>
+  <div class="cp_ipselect cp_sl01">
+    <select id="broadcast-del-select">
+      <option value="">--配信予約選択--</option>
+    </select>
+  </div>
+  <div id="deletebtn" class="buttonarea">
+    <button class="button-g button-8" value="delete" onclick="deleteit('broadcast')">配信削除</button>
+  </div>
+  <div class="buttonarea">
+    <button class="button-g" value="back" onclick="history.back()">戻る</button>
+  </div>
+  <script>
+    // 配信
+    const broadcastselectDom = document.getElementById('broadcast-select');
+    // 削除配信
+    const delbroadcastselectDom = document.getElementById('broadcast-del-select');
+    // プラン
+    const planselectDom = document.getElementById('plan-select');
+    // チャネル選択
+    const channelselectDom = document.getElementById('channel-select');
+    // 日付
+    const senddateDom = document.getElementById('date');
+    // 時間
+    const sendtimeDom = document.getElementById('time');
+    // 編集対象
+    const editbtnDom = document.getElementById('editbtn');
+    // CSVファイル
+    const csvfileDom = document.getElementById('csvfilepath');
+
+    // 配信登録完了
+    window.api.on('edit_finish', arg => {
+      // メッセージオプション
+      const messageOption = {
+        title: '編集完了',
+        message: '編集が完了しました',
+        type: 'info',
+      }
+      // メッセージ送付
+      window.api.send('showmessage', messageOption);
+      // フォーム初期化
+      senddateDom.value = "";
+      sendtimeDom.value = "00:00";
+      broadcastselectDom.options[0].selected = true;
+      delbroadcastselectDom.options[0].selected = true;
+      planselectDom.options[0].selected = true;
+      channelselectDom.options[0].selected = true;
+    });
+
+    // 配信削除完了
+    window.api.on('delete_finish', arg => {
+      // メッセージオプション
+      const messageOption = {
+        title: '削除完了',
+        message: '配信削除が完了しました',
+        type: 'info',
+      }
+      // メッセージ送付
+      window.api.send('showmessage', messageOption);
+      // フォームクリア
+      broadcastselectDom.options[0].selected = true;
+      // 戻る
+      history.back();
+    });
+
+    // データなし
+    window.api.on('notexists', arg => {
+      // メッセージオプション
+      const messageOption = {
+        title: 'エラー',
+        message: arg,
+        type: 'fatal',
+      }
+      // ポップアップ表示
+      window.api.send('showmessage', messageOption);
+      // 戻る
+      history.back()
+    });
+
+    // エラー発生
+    window.api.on('error', arg => {
+      // メッセージオプション
+      const messageOption = {
+        title: 'エラー',
+        message: arg,
+        type: 'fatal',
+      }
+      // ポップアップ表示
+      window.api.send('showmessage', messageOption);
+    });
+
+    // 配信一覧
+    window.api.on('broadcastMasterllist', arg => {
+      try {
+        // 配信自動生成
+        arg.forEach((obj, idx) => {
+          // オプションタグ生成
+          const option = document.createElement('option');
+          // 値代入
+          option.value = String(obj.id);
+          // 配信代入
+          option.textContent = `${obj.id}: ${obj.broadcastname}`;
+          // セレクトに追加
+          broadcastselectDom.appendChild(option);
+          // オプションタグ生成
+          const deloption = document.createElement('option');
+          // 値代入
+          deloption.value = String(obj.id);
+          // 配信代入
+          deloption.textContent = `${obj.id}: ${obj.broadcastname}`;
+          // セレクトに追加
+          delbroadcastselectDom.appendChild(deloption);
+          // localStorage保存
+          localStorage.setItem('editbroadcast', JSON.stringify(arg));
+        });
+
+      } catch (e) {
+        // エラー処理
+        console.log(e);
+      }
+    });
+
+    // チャンネル
+    window.api.on('channelMasterllist', arg => {
+      try {
+        // チャンネル自動生成
+        arg.forEach((obj, idx) => {
+          // オプションタグ生成
+          const option = document.createElement('option');
+          // 値代入
+          option.value = String(obj.id);
+          // チャンネル代入
+          option.textContent = `${obj.id}: ${obj.channelname}`;
+          // セレクトに追加
+          channelselectDom.appendChild(option);
+        });
+
+      } catch (e) {
+        // エラー処理
+        console.log(e);
+      }
+    });
+
+    // プラン
+    window.api.on('planMasterllist', arg => {
+      try {
+        // プラン自動生成
+        arg.forEach((obj, idx) => {
+          // オプションタグ生成
+          const option = document.createElement('option');
+          // 値代入
+          option.value = String(obj.id);
+          // プラン代入
+          option.textContent = `${obj.id}: ${obj.planname}`;
+          // セレクトに追加
+          planselectDom.appendChild(option);
+        });
+
+      } catch (e) {
+        // エラー処理
+        console.log(e);
+      }
+    });
+
+    // ユーザ
+    window.api.on("usersCsvlist", arg => {
+      try {
+        // ユーザ一覧
+        const userArray = arg.record.flat();
+        // JSON文字列変換
+        const serializedArray = JSON.stringify(userArray);
+        // localStorage保存
+        localStorage.setItem('edituserArray', serializedArray);
+        // ファイルパス表示
+        csvfileDom.innerHTML = arg.filename;
+
+      } catch (e) {
+        // エラー処理
+        console.log(e);
+      }
+    });
+
+    // ページ遷移
+    const transfer = channel => {
+      try {
+        // 配信ページ遷移
+        window.api.send('page', channel);
+
+      } catch (e) {
+        // エラー処理
+        console.log(e);
+      }
+    }
+
+    // CSVモード
+    const readCSV = () => {
+      try {
+        // CSVモード
+        window.api.send('csv');
+
+      } catch (e) {
+        // エラー処理
+        window.api.send('error', e);
+      }
+    }
+
+    // CSVクリアモード
+    const clearCSV = () => {
+      try {
+        // localStorageクリア
+        localStorage.clear();
+        // ファイルパス表示
+        csvfileDom.innerHTML = "";
+
+      } catch (e) {
+        // エラー処理
+        window.api.send("error", e);
+      }
+    }
+
+    // 配信登録
+    const edit = () => {
+      try {
+        // エラーフラグ
+        let errorflg = false;
+        // エラーメッセージ
+        let errorArray = [];
+        // エラーメッセージ
+        let userArray = [];
+
+        /* バリデーション */
+        // 配信予約名
+        if (broadcastselectDom.options[0].selected) {
+          errorArray.push('配信予約を選択してください');
+          errorflg = true;
+        }
+
+        // チャンネル名
+        if (channelselectDom.options[0].selected) {
+          errorArray.push('チャンネルを選択してください');
+          errorflg = true;
+        }
+
+        // プラン名
+        if (planselectDom.options[0].selected) {
+          errorArray.push('プランを選択してください');
+          errorflg = true;
+        }
+
+        // エラーなし
+        if (!errorflg) {
+          // 選択インデックス
+          const idx = broadcastselectDom.selectedIndex;
+          // オプション値
+          const broadcastId = broadcastselectDom.options[idx].value;
+          // 選択チャンネル
+          const channelId = channelselectDom.value;
+          // 選択プラン
+          const planId = planselectDom.value;
+          // 配信日
+          const date = senddateDom.value;
+          // 配信時間
+          const time = sendtimeDom.value;
+          // ユーザ一覧
+          const serializedArray = localStorage.getItem('edituserArray');
+
+          // ユーザなし
+          if (!serializedArray) {
+            errorArray.push("顧客CSVを選択してください");
+            errorflg = true;
+
+          } else {
+            // JSON文字列変換
+            userArray = JSON.parse(serializedArray);
+          }
+          // 編集オプション
+          const editOption = {
+            bdid: broadcastId, // 配信名
+            planId: planId, // 選択プラン
+            channelId: channelId, // 選択チャンネル
+            date: date, // 配信日
+            time: time, // 配信時間
+            users: userArray, // ユーザ一覧
+          }
+          // 配信モード
+          window.api.send('broadcastedit', editOption);
+
+        } else {
+          // メッセージオプション
+          const messageOption = {
+            title: 'エラー',
+            message: errorArray.join('|'),
+            type: 'error',
+          }
+          // エラー表示
+          window.api.send('showmessage', messageOption);
+        }
+
+      } catch (e) {
+        // エラー処理
+        window.api.send('error', e);
+      }
+    }
+
+    // 配信削除
+    const deleteit = table => {
+      try {
+        // 選択インデックス
+        const idx = delbroadcastselectDom.selectedIndex;
+        // オプション値
+        const broadcastId = delbroadcastselectDom.options[idx].value;
+        // オプション値
+        const option = delbroadcastselectDom.options[idx].innerHTML;
+        // 送付内容
+        const sendObj = {
+          table: table,
+          id: broadcastId,
+          name: option,
+        }
+        // 削除プラン
+        if (delbroadcastselectDom.options[0].selected) {
+          errorArray.push("削除対象プランを選択してください");
+          errorflg = true;
+        }
+        // 配信モード
+        window.api.send('delete', sendObj);
+
+      } catch (e) {
+        // エラー処理
+        window.api.send('error', e);
+      }
+    }
+
+    // セレクトボックス変更
+    const broadcastchange = obj => {
+      // 配信一覧
+      const broadcastArray = JSON.parse(localStorage.getItem('editbroadcast'));
+      // 選択インデックス
+      const idx = obj.selectedIndex;
+      // 値
+      const value = obj.options[idx].value;
+      // プラン選択値
+      const planSelected = String(broadcastArray[idx - 1].plan_id);
+      // チャンネル選択値
+      const channelSelected = String(broadcastArray[idx - 1].channel_id);
+      // 送信時間一覧
+      const sendtime = formatDateInYyyymmdd(new Date(broadcastArray[idx - 1].sendtime));
+      // 送信日分割
+      const sendArray = sendtime.split(' ');
+      // 送信日
+      const senddateStr = sendArray[0];
+      // 送信時間
+      const sendtimeStr = sendArray[1];
+      // プラン選択
+      const planOptions = document.querySelectorAll('#plan-select option');
+      Array.from(planOptions).filter(ele => ele.value === planSelected)[0].selected = true;
+      // チャンネル選択
+      const channelOptions = document.querySelectorAll('#channel-select option');
+      Array.from(channelOptions).filter(ele => ele.value === channelSelected)[0].selected = true;
+      // 日付設定
+      senddateDom.value = senddateStr;
+      // 時間設定
+      sendtimeDom.value = sendtimeStr;
+    }
+
+    // 「yyyymmdd」形式の日付文字列に変換する関数
+    const formatDateInYyyymmdd = date => {
+      const y = date.getFullYear();
+      const mh = date.getMonth() + 1;
+      const d = date.getDate();
+      const h = date.getHours();
+      const m = date.getMinutes();
+      const s = date.getSeconds();
+
+      const yyyy = y.toString();
+      const mhmh = ('00' + mh).slice(-2);
+      const dd = ('00' + d).slice(-2);
+      const hh = ('00' + h).slice(-2);
+      const mm = ('00' + m).slice(-2);
+      const ss = ('00' + s).slice(-2);
+
+      return `${yyyy}-${mhmh}-${dd} ${hh}:${mm}:${ss}`;
+    }
+  </script>
+</body>
+
+</html>
